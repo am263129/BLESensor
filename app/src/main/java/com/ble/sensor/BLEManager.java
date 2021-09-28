@@ -13,6 +13,9 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.AsyncQueryHandler;
 import android.content.Context;
 import android.os.AsyncTask;
@@ -32,15 +35,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collector;
 
-import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
-import no.nordicsemi.android.support.v18.scanner.ScanCallback;
-import no.nordicsemi.android.support.v18.scanner.ScanResult;
-import no.nordicsemi.android.support.v18.scanner.ScanSettings;
 
 public class BLEManager {
     public BluetoothAdapter mBluetoothAdapter;
     public BluetoothLeScanner bluetoothLeScanner;
-    public BluetoothLeScannerCompat scanner;
     public BluetoothManager bluetoothManager;
     public ScanSettings scanSettings;
     public AdvertiseSettings adSettings;
@@ -65,9 +63,8 @@ public class BLEManager {
     public void initScanner() {
         bluetoothManager = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
-
-//        bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-        scanner = BluetoothLeScannerCompat.getScanner();
+        bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+//        scanner = BluetoothLeScannerCompat.getScanner();
         gattCallback = new BluetoothGattCallback() {
             @Override
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
@@ -154,18 +151,15 @@ public class BLEManager {
         };
         scanSettings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .setLegacy(false)
-                .setReportDelay(10000)
-                .setUseHardwareBatchingIfSupported(true)
                 .build();
-        adSettings = new AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .build();
+//        adSettings = new AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+//                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+//                .build();
         scanCallback = new ScanCallback() {
             @Override
-            public void onBatchScanResults(@NonNull List<ScanResult> results) {
+            public void onBatchScanResults(List<ScanResult> results) {
                 addLog("onBatchScanResults. size:" + results.size());
-                for (no.nordicsemi.android.support.v18.scanner.ScanResult result : results) {
+                for (ScanResult result : results) {
                     BluetoothDevice device = result.getDevice();
                     if (device != null) {
                         String address = device.getAddress();
@@ -173,8 +167,8 @@ public class BLEManager {
                             if (result.getScanRecord().getBytes() != null) {
                                 Log.e(TAG, "--------scanned device record data start---------");
                                 for (byte item : result.getScanRecord().getBytes()) {
-                                    Log.e(TAG, "data:" + String.format("0x%20x", item));
-                                    addLog("data:" + String.format("0x%20x", item));
+                                    Log.e(TAG, "databatch:" + String.format("0x%20x", item));
+                                    addLog("databatch:" + String.format("0x%20x", item));
                                 }
                                 Log.e(TAG, "--------scanned device record data end---------");
                             }
@@ -217,8 +211,117 @@ public class BLEManager {
                 }
                 super.onBatchScanResults(results);
             }
+
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                addLog("Found device in onScanResult");
+                BluetoothDevice device = result.getDevice();
+                if (device != null) {
+                    String address = device.getAddress();
+                    if (result.getScanRecord() != null) {
+                        if (result.getScanRecord().getBytes() != null) {
+                            Log.e(TAG, "--------scanned device record data start---------");
+                            for (byte item : result.getScanRecord().getBytes()) {
+                                Log.e(TAG, "data:" + String.format("0x%20x", item));
+                                addLog("data:" + String.format("0x%20x", item));
+                            }
+                            Log.e(TAG, "--------scanned device record data end---------");
+                        } else {
+                            addLog("Record.getbyte() null");
+                        }
+                        return;
+                    } else {
+                        addLog("Record null");
+                    }
+                    final BleAdvertisedData badata = BleUtil.parseAdertisedData(result.getScanRecord().getBytes());
+                    String devicename = result.getDevice().getName();
+                    addLog("name from result " + devicename);
+                    if (devicename == null) {
+                        devicename = result.getScanRecord().getDeviceName();
+                        addLog("name from record " + devicename);
+                    }
+                    if (devicename == null) {
+                        addLog("name from record also null");
+                        devicename = badata.getName();
+                        addLog("name from byte data:" + devicename);
+                    }
+//                        String name = result.getScanRecord() != null ? result.getScanRecord().getDeviceName() : null;
+                    addLog("Bluetooth Device Found. Name:" + devicename + " Address:" + address);
+                    if (devicename != null && devicename.equals("WearDev")) {
+                        addLog("Sensor Device Found. Name:" + devicename + " Address:" + address);
+                        if (isScanning) {
+                            isScanning = false;
+                            addLog("Stop scanning.");
+                            StopScanning();// if device find, stop scanning and connect.
+                            context.btnConnect.setEnabled(true);
+                        }
+                        sensor = device;
+                        addLog("Connecting to device...");
+                        sensor.connectGatt(context, true, gattCallback);
+                    }
+                }
+                else addLog("scanned device null");
+                super.onScanResult(callbackType, result);
+            }
         };
-    }
+
+//            @Override
+//            public void onBatchScanResults(@NonNull List<ScanResult> results) {
+//                addLog("onBatchScanResults. size:" + results.size());
+//                for (no.nordicsemi.android.support.v18.scanner.ScanResult result : results) {
+//                    BluetoothDevice device = result.getDevice();
+//                    if (device != null) {
+//                        String address = device.getAddress();
+//                        if (result.getScanRecord() != null) {
+//                            if (result.getScanRecord().getBytes() != null) {
+//                                Log.e(TAG, "--------scanned device record data start---------");
+//                                for (byte item : result.getScanRecord().getBytes()) {
+//                                    Log.e(TAG, "data:" + String.format("0x%20x", item));
+//                                    addLog("data:" + String.format("0x%20x", item));
+//                                }
+//                                Log.e(TAG, "--------scanned device record data end---------");
+//                            }
+//                            else {
+//                                addLog("Record.getbyte() null");
+//                            }
+//                            return;
+//                        }
+//                        else{
+//                            addLog("Record null");
+//                        }
+//                        final BleAdvertisedData badata = BleUtil.parseAdertisedData(result.getScanRecord().getBytes());
+//                        String devicename = result.getDevice().getName();
+//                        addLog("name from result " + devicename);
+//                        if (devicename == null) {
+//                            devicename = result.getScanRecord().getDeviceName();
+//                            addLog("name from record " + devicename);
+//                        }
+//                        if (devicename == null) {
+//                            addLog("name from record also null");
+//                            devicename = badata.getName();
+//                            addLog("name from byte data:" + devicename);
+//                        }
+////                        String name = result.getScanRecord() != null ? result.getScanRecord().getDeviceName() : null;
+//                        addLog("Bluetooth Device Found. Name:" + devicename + " Address:" + address);
+//                        if (devicename != null && devicename.equals("WearDev")) {
+//                            addLog("Sensor Device Found. Name:" + devicename + " Address:" + address);
+//                            if (isScanning) {
+//                                isScanning = false;
+//                                addLog("Stop scanning.");
+//                                StopScanning();// if device find, stop scanning and connect.
+//                                context.btnConnect.setEnabled(true);
+//                            }
+//                            sensor = device;
+//                            addLog("Connecting to device...");
+//                            sensor.connectGatt(context, true, gattCallback);
+//                            break;
+//                        }
+//                    }
+//                }
+//                super.onBatchScanResults(results);
+//            }
+//        };
+//    }
 
 
 //            else {
@@ -271,7 +374,7 @@ public class BLEManager {
 //            super.onScanResult(callbackType, result);
 //        }
 //    };
-
+    }
     public void StartScanning() {
         if (!isScanning) {
             // Stops scanning after a predefined scan period.
@@ -283,13 +386,15 @@ public class BLEManager {
 //                    context.btnConnect.setEnabled(true);
 //                }
 //            }, SCAN_PERIOD);
+            addLog("Scan start");
             isScanning = true;
             context.btnConnect.setEnabled(false);
             scannedDevices.clear();
-            scanner.startScan(null, scanSettings, scanCallback);
+            bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
+            addLog("Scan started");
         } else {
             isScanning = false;
-            scanner.stopScan(scanCallback);
+            bluetoothLeScanner.stopScan(scanCallback);
         }
     }
 
@@ -297,7 +402,7 @@ public class BLEManager {
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {
-                scanner.stopScan(scanCallback);
+                bluetoothLeScanner.stopScan(scanCallback);
             }
         });
         isScanning = false;
