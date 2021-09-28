@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/SDK/platforms/android-30/data/res/layout/simple_spinner_item.xml" value="0.259375" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/drawable/backtoggle.xml" value="0.21354166666666666" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/layout/activity_bleconnection.xml" value="0.2884927066450567" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/layout/activity_main.xml" value="0.33" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/layout/device_item.xml" value="0.5" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" value="0.17592592592592593" />
+        <entry key="..\:/work/Android/BLESensor/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" value="0.17592592592592593" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" project-jdk-name="1.8" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+</project>
