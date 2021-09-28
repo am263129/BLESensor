@@ -57,7 +57,6 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback, AdapterView.OnItemSelectedListener {
     MediaRecorder recorder;
     SurfaceHolder holder;
-    CameraModule camera;
     private int RECORD_AUDIO = 9001;
     private final int LOCATION = 9002;
     private final int BLUETOOTH = 9003;
@@ -172,121 +171,16 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     /* init video recorder */
     private void initRecorder() {
-        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-        camera = new CameraModule();
-        try {
-            if (cameraManager.getCameraIdList().length <= 0) {
-                Log.e(DEVTAG, "No camera available");
-                return;
-            }
-            for (String item : cameraManager.getCameraIdList()) {
-                Log.e(DEVTAG, "Camera :" + item);
-            }
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
-        }
-        
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         recorder.setVideoSource(MediaRecorder.VideoSource.DEFAULT);
         CamcorderProfile cpHigh = CamcorderProfile
                 .get(CamcorderProfile.QUALITY_HIGH);
         recorder.setProfile(cpHigh);
-        File videofile = new File(Util.getOutputMediaFileUri(Util.MEDIA_TYPE_VIDEO));
-        recorder.setOutputFile(videofile.getPath());
-        recorder.setMaxDuration(50000); // 50 seconds
-        recorder.setMaxFileSize(50000000); // Approximately 50 megabytes
+        recorder.setOutputFile(Util.getOutputMediaFileUri(Util.MEDIA_TYPE_VIDEO));
+        recorder.setMaxDuration(1800000); // 30 mins
+        recorder.setMaxFileSize(500000000); // Approximately 500 megabytes
         recorderReady = true;
-    }
-
-    public interface CameraSupport {
-        CameraSupport open(int cameraId);
-
-        int getOrientation(int cameraId);
-    }
-
-    public class CameraModule {
-
-        CameraSupport provideCameraSupport() {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                return new CameraNew(MainActivity.this);
-            } else {
-                return new CameraOld();
-            }
-        }
-    }
-
-    public class CameraOld implements CameraSupport {
-
-        private Camera camera;
-
-        @Override
-        public CameraSupport open(final int cameraId) {
-            this.camera = Camera.open(cameraId);
-            return this;
-        }
-
-        @Override
-        public int getOrientation(final int cameraId) {
-            Camera.CameraInfo info = new Camera.CameraInfo();
-            Camera.getCameraInfo(cameraId, info);
-            return info.orientation;
-        }
-
-    }
-
-    public class CameraNew implements CameraSupport {
-
-        private CameraDevice camera;
-        private CameraManager cmanager;
-
-        public CameraNew(final Context context) {
-            this.cmanager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-        }
-
-        @Override
-        public CameraSupport open(final int cameraId) {
-            try {
-                String[] cameraIds = cmanager.getCameraIdList();
-                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA}, CAMERA);
-                }
-                cmanager.openCamera(cameraIds[cameraId], new CameraDevice.StateCallback() {
-                    @Override
-                    public void onOpened(CameraDevice camera) {
-                        CameraNew.this.camera = camera;
-                    }
-
-                    @Override
-                    public void onDisconnected(CameraDevice camera) {
-                        CameraNew.this.camera = camera;
-                        // TODO handle
-                    }
-
-                    @Override
-                    public void onError(CameraDevice camera, int error) {
-                        CameraNew.this.camera = camera;
-                        // TODO handle
-                    }
-                }, null);
-            } catch (Exception e) {
-                // TODO handle
-            }
-            return this;
-        }
-
-        @Override
-        public int getOrientation(final int cameraId) {
-            try {
-                String[] cameraIds = cmanager.getCameraIdList();
-                CameraCharacteristics characteristics = cmanager.getCameraCharacteristics(cameraIds[cameraId]);
-                return characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-            } catch (CameraAccessException e) {
-                // TODO handle
-                return 0;
-            }
-        }
-
     }
 
     /* Prepare video recorder */
@@ -401,9 +295,10 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
      */
     public void Connect(View View) {
         if (bluetoothReady) {
-            if (BluetoothAdapter.getDefaultAdapter() != null) {
+            if (BluetoothAdapter.getDefaultAdapter() == null) {
                 bluetoothReady = false;
                 AddLog("Bluetooth disabled. please turn on");
+                return;
             }
             AddLog("Start Scan Device...");
             manager.StartScanning();
