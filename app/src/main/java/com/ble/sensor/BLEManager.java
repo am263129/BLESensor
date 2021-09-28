@@ -19,6 +19,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.AsyncQueryHandler;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.os.Handler;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -41,7 +42,8 @@ public class BLEManager {
     public String TAG = "BLEManager";
     public List<BluetoothGattService> servicelist = new ArrayList<>();
     public List<BluetoothGattCharacteristic> characteristicslist = new ArrayList<>();
-
+    private Handler handler = new Handler();
+    private static final long SCAN_PERIOD = 20000;
     public BLEManager(MainActivity context) {
         this.context = context;
     }
@@ -151,6 +153,7 @@ public class BLEManager {
                         isScanning = false;
                         addLog("Stop scanning.");
                         StopScanning();// if device find, stop scanning and connect.
+                        context.btnConnect.setEnabled(true);
                     }
                     sensor = result.getDevice();
                     addLog("Connecting to device...");
@@ -162,13 +165,23 @@ public class BLEManager {
     }
 
     public void StartScanning() {
-        AsyncTask.execute(new Runnable() {
-            @Override
-            public void run() {
-                bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
-            }
-        });
-        isScanning = true;
+        if (!isScanning) {
+            // Stops scanning after a predefined scan period.
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    isScanning = false;
+                    bluetoothLeScanner.stopScan(scanCallback);
+                    context.btnConnect.setEnabled(true);
+                }
+            }, SCAN_PERIOD);
+            isScanning = true;
+            context.btnConnect.setEnabled(false);
+            bluetoothLeScanner.startScan(null, scanSettings, scanCallback);
+        } else {
+            isScanning = false;
+            bluetoothLeScanner.stopScan(scanCallback);
+        }
     }
 
     public void StopScanning() {

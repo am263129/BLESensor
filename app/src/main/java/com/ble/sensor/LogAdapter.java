@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 
-public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder> {
+public class LogAdapter extends RecyclerView.Adapter<LogAdapter.ViewHolder> {
 
     private ArrayList<LogItem> mDeviceList;
     /**
@@ -37,7 +37,7 @@ public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder
      * @param devicelist Arraylist<Sensor></> containing the data to populate views to be used
      * by RecyclerView.
      */
-    public DeviceAdapter(ArrayList<LogItem> devicelist) {
+    public LogAdapter(ArrayList<LogItem> devicelist) {
         mDeviceList = devicelist;
     }
 

@@ -53,7 +53,7 @@ public class Util {
         } else {
             return null;
         }
-
+        Log.e("FASA","Return file:"+mediaFile.getPath());
         return mediaFile;
     }
 

@@ -12,26 +12,23 @@ import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattService;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.hardware.Camera;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.transition.Fade;
 import android.transition.Slide;
 import android.transition.Transition;
 import android.transition.TransitionManager;
@@ -53,7 +50,6 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,13 +57,14 @@ import java.util.UUID;
 public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback, AdapterView.OnItemSelectedListener {
     MediaRecorder recorder;
     SurfaceHolder holder;
+    CameraModule camera;
     private int RECORD_AUDIO = 9001;
     private final int LOCATION = 9002;
     private final int BLUETOOTH = 9003;
-
+    private final int CAMERA = 9004;
     boolean recording = false;
 
-    private static DeviceAdapter LogAdapter;
+    private static com.ble.sensor.LogAdapter LogAdapter;
     private static ArrayList<LogItem> logList = new ArrayList<>();
     protected LinearLayoutManager mLayoutManager;
 
@@ -78,7 +75,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private CheckBox filterAccell, filterGyro, filterCompass, filterTemperature;
     private boolean enableAccell = false, enableGyro = false, enableCompass = false, enableTemperature = false;
     private EditText edtHz, edtTimes;
-    private Button btnConnect;
+    public Button btnConnect;
     private static RecyclerView LogView;
     private static CheckBox enablesavefile;
     private ImageView iconToogle;
@@ -89,14 +86,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     public UUID selectedUuid;
     public int selectedcharacteristic = 0;
-    private Handler delayHandler = new Handler() {
-        @Override
-        public void handleMessage(@NonNull Message msg) {
-            manager.StopScanning();
-            btnConnect.setEnabled(true);
-            super.handleMessage(msg);
-        }
-    };
+
+
+    private final String DEVTAG = "DEV-TAG";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -106,23 +98,31 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
-        recorder = new MediaRecorder();
+
         manager = new BLEManager(this);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, RECORD_AUDIO);
         } else {
+            Log.e(DEVTAG, "permission granted for record camera");
             initRecorder();
         }
         initUi();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Log.e(DEVTAG, "Build Version:" + Build.VERSION.SDK_INT);
             checkPermission();
-        else {
+        } else {
+            Log.e(DEVTAG, "check bluetooth 1");
             checkBluetooth();
         }
+
+        //register bluetooth receiver
+        IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(bluetoothReceiver, filter);
     }
 
+    /* Initialize layout view */
     private void initUi() {
         setContentView(R.layout.activity_main);
         root = findViewById(R.id.root);
@@ -144,13 +144,19 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         iconToogle = findViewById(R.id.iconToogle);
         services = findViewById(R.id.serviceList);
         characteristics = findViewById(R.id.characteristicList);
-        LogAdapter = new DeviceAdapter(logList);
+        LogAdapter = new LogAdapter(logList);
         LogView.setAdapter(LogAdapter);
         mLayoutManager = new LinearLayoutManager(this);
         LogView.setLayoutManager(mLayoutManager);
         refresh(true);//refresh both spinner
     }
 
+    /**
+     * Reset spinners item when read service from ble device.
+     *
+     * @param flag if true, refresh both service and characteristics spinners.
+     *             if false, refresh only characteristics spinner
+     */
     public void refresh(boolean flag) {
         if (flag) {
             ArrayAdapter<String> serviceAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, serviceList);
@@ -162,12 +168,25 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         characteristics.setAdapter(charateristicsAdapter);
     }
 
-    /**
-     * Video Recording part
-     * ------- Start --------
-     */
+    /* ------- Video Recording part  Start -------- */
 
+    /* init video recorder */
     private void initRecorder() {
+        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        camera = new CameraModule();
+        try {
+            if (cameraManager.getCameraIdList().length <= 0) {
+                Log.e(DEVTAG, "No camera available");
+                return;
+            }
+            for (String item : cameraManager.getCameraIdList()) {
+                Log.e(DEVTAG, "Camera :" + item);
+            }
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+        
+        recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         recorder.setVideoSource(MediaRecorder.VideoSource.DEFAULT);
         CamcorderProfile cpHigh = CamcorderProfile
@@ -176,10 +195,101 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         File videofile = new File(Util.getOutputMediaFileUri(Util.MEDIA_TYPE_VIDEO));
         recorder.setOutputFile(videofile.getPath());
         recorder.setMaxDuration(50000); // 50 seconds
-        recorder.setMaxFileSize(5000000); // Approximately 5 megabytes
+        recorder.setMaxFileSize(50000000); // Approximately 50 megabytes
         recorderReady = true;
     }
 
+    public interface CameraSupport {
+        CameraSupport open(int cameraId);
+
+        int getOrientation(int cameraId);
+    }
+
+    public class CameraModule {
+
+        CameraSupport provideCameraSupport() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                return new CameraNew(MainActivity.this);
+            } else {
+                return new CameraOld();
+            }
+        }
+    }
+
+    public class CameraOld implements CameraSupport {
+
+        private Camera camera;
+
+        @Override
+        public CameraSupport open(final int cameraId) {
+            this.camera = Camera.open(cameraId);
+            return this;
+        }
+
+        @Override
+        public int getOrientation(final int cameraId) {
+            Camera.CameraInfo info = new Camera.CameraInfo();
+            Camera.getCameraInfo(cameraId, info);
+            return info.orientation;
+        }
+
+    }
+
+    public class CameraNew implements CameraSupport {
+
+        private CameraDevice camera;
+        private CameraManager cmanager;
+
+        public CameraNew(final Context context) {
+            this.cmanager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+        }
+
+        @Override
+        public CameraSupport open(final int cameraId) {
+            try {
+                String[] cameraIds = cmanager.getCameraIdList();
+                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CAMERA}, CAMERA);
+                }
+                cmanager.openCamera(cameraIds[cameraId], new CameraDevice.StateCallback() {
+                    @Override
+                    public void onOpened(CameraDevice camera) {
+                        CameraNew.this.camera = camera;
+                    }
+
+                    @Override
+                    public void onDisconnected(CameraDevice camera) {
+                        CameraNew.this.camera = camera;
+                        // TODO handle
+                    }
+
+                    @Override
+                    public void onError(CameraDevice camera, int error) {
+                        CameraNew.this.camera = camera;
+                        // TODO handle
+                    }
+                }, null);
+            } catch (Exception e) {
+                // TODO handle
+            }
+            return this;
+        }
+
+        @Override
+        public int getOrientation(final int cameraId) {
+            try {
+                String[] cameraIds = cmanager.getCameraIdList();
+                CameraCharacteristics characteristics = cmanager.getCameraCharacteristics(cameraIds[cameraId]);
+                return characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+            } catch (CameraAccessException e) {
+                // TODO handle
+                return 0;
+            }
+        }
+
+    }
+
+    /* Prepare video recorder */
     private void prepareRecorder() {
         recorder.setPreviewDisplay(holder.getSurface());
         try {
@@ -193,19 +303,28 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    /**
+     * Start/Stop Record video
+     *
+     * @param v record button
+     */
     public void recordVideo(View v) {
-        if (recording) {
-            recorder.stop();
-            recording = false;
-            Toast.makeText(this, "Saving...", Toast.LENGTH_SHORT).show();
-            // Let's initRecorder so we can record again
-            initRecorder();
-            prepareRecorder();
+        if (!recorderReady) {
+            Toast.makeText(this, "Unable to capture video.", Toast.LENGTH_SHORT).show();
         } else {
-            recording = true;
-            recorder.start();
+            if (recording) {
+                recorder.stop();
+                recording = false;
+                Toast.makeText(this, "Saving...", Toast.LENGTH_SHORT).show();
+                // Let's initRecorder so we can record again
+                initRecorder();
+                prepareRecorder();
+            } else {
+                recording = true;
+                recorder.start();
+            }
+            iconToogle.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
         }
-        iconToogle.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
     }
 
     public void surfaceCreated(SurfaceHolder holder) {
@@ -226,6 +345,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         finish();
     }
 
+    /**
+     * Expand setting view when click setting button
+     *
+     * @param view setting button
+     */
     public void toggleExpand(View view) {
         Transition transition = new Slide(Gravity.TOP);
         transition.setDuration(300);
@@ -234,22 +358,18 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         settingArea.setVisibility(settingArea.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
     }
 
-    /**
-     * Video Recording part
-     * ------- End --------
-     */
+    /* ------- Video Recording part  End -------- */
 
 
-    /**
-     * Bluetooth Communication part
-     * ------- start --------
-     */
+    /* ------- Bluetooth Communication part start -------- */
 
     /* Need Fine Location permission from android M or above. */
     public void checkPermission() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e(DEVTAG, "Require location permission");
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION);
         } else {
+            Log.e(DEVTAG, "check bluetooth 2");
             checkBluetooth();
         }
     }
@@ -257,8 +377,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     /* Check if bluetooth enabled. if not, request to turn on bluetooth */
     public void checkBluetooth() {
         manager.mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (manager.mBluetoothAdapter == null || !manager.mBluetoothAdapter.isMultipleAdvertisementSupported()) {
-            Toast.makeText(this, (manager.mBluetoothAdapter != null) ? "Multiple advertisement not supported" : "Device does not support Bluetooth", Toast.LENGTH_LONG).show();
+        if (manager.mBluetoothAdapter == null) {
+            Toast.makeText(this, "Device does not support Bluetooth", Toast.LENGTH_LONG).show();
+            Log.e(DEVTAG, "device doesn't support bluetooth");
 //            finish();
         } else if (!manager.mBluetoothAdapter.isEnabled()) {
             //Turn on bluetooth
@@ -266,16 +387,12 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(intent, BLUETOOTH);
         } else {
+            AddLog("bluetooth ready, init scanner");
+            Log.e(DEVTAG, "bluetooth ready, init scanner");
             bluetoothReady = true;
             manager.initScanner();
         }
     }
-
-
-    public void ConnectBLE(BluetoothDevice device) {
-
-    }
-
 
     /**
      * If bluetooth device is ready, start scan device and auto connect.
@@ -284,13 +401,14 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
      */
     public void Connect(View View) {
         if (bluetoothReady) {
+            if (BluetoothAdapter.getDefaultAdapter() != null) {
+                bluetoothReady = false;
+                AddLog("Bluetooth disabled. please turn on");
+            }
             AddLog("Start Scan Device...");
             manager.StartScanning();
-            btnConnect.setEnabled(false);
-            delayHandler.sendEmptyMessageDelayed(0, 60000);
-        }
-        else{
-            Toast.makeText(this,"Can't use bluetooth. check bluetooth enabled, or device support bleutooth.",Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Can't use bluetooth. check bluetooth enabled, or device support bleutooth.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -312,8 +430,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
      * @param view read button
      */
     public void Read(View view) {
-        if(serviceList.size() == 0)
-        {
+        if (serviceList.size() == 0) {
             AddLog("No service available");
             return;
         }
@@ -328,8 +445,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
      */
     public void Write(View view) {
         createConfig();
-        if(characteristicList.size() == 0)
-        {
+        if (characteristicList.size() == 0) {
             AddLog("No characteristics exist.");
             return;
         }
@@ -337,6 +453,11 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             manager.writeData(selectedcharacteristic);
     }
 
+    /**
+     * Create config file with user setting.
+     *
+     * @return string config
+     */
     public String createConfig() {
         String config = (filterAccell.isChecked() ? "AA" : "55") + " "
                 + (filterGyro.isChecked() ? "AA" : "55") + " "
@@ -348,20 +469,22 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         return config;
     }
 
+    /**
+     * Show log to display and save to log file if enabled file save.
+     *
+     * @param msg log data
+     */
     public static void AddLog(String msg) {
         if (logList.size() > 50)
             logList.remove(0);
         logList.add(new LogItem(msg));
         LogAdapter.notifyDataSetChanged();
         LogView.scrollToPosition(logList.size() - 1);
-        if(enablesavefile.isChecked())
+        if (enablesavefile.isChecked())
             Util.printLog(msg);
     }
 
-    /**
-     * Bluetooth Communication part
-     * ------- End --------
-     */
+    /* ------- Bluetooth Communication part End -------- */
 
 
     @Override
@@ -375,7 +498,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
                 initRecorder();
                 prepareRecorder();
             } else {
-                Toast.makeText(this, "Permission dinied", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Permission denied", Toast.LENGTH_LONG).show();
                 //User denied Permission.
             }
         }
@@ -383,7 +506,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 checkBluetooth();
             } else {
-                Toast.makeText(this, "Permission dinied", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Permission denied", Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -405,12 +528,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+
         switch (view.getId()) {
             case R.id.serviceList:
+                Log.e(DEVTAG, "Service spinner selected:" + position + ", UUID:" + serviceList.get(position));
                 manager.getCharacteristic(position);
                 selectedcharacteristic = 0;
                 break;
             case R.id.characteristicList:
+                Log.e(DEVTAG, "Characteristics spinner selected:" + position + ", UUID:" + characteristicList.get(position));
                 selectedcharacteristic = position;
                 selectedUuid = UUID.fromString(characteristicList.get(position));
                 break;
@@ -421,4 +547,43 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     public void onNothingSelected(AdapterView<?> parent) {
 
     }
+
+    @Override
+    protected void onStop() {
+
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(bluetoothReceiver);
+    }
+
+
+    private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+                switch (state) {
+                    case BluetoothAdapter.STATE_OFF:
+                        AddLog("Bluetooth Turned Off");
+                        bluetoothReady = false;
+                        break;
+                    case BluetoothAdapter.STATE_TURNING_OFF:
+                        AddLog("Bluetooth turning off...");
+                        break;
+                    case BluetoothAdapter.STATE_ON:
+                        AddLog("Bluetooth Turned On");
+                        bluetoothReady = true;
+                        break;
+                    case BluetoothAdapter.STATE_TURNING_ON:
+                        AddLog("Bluetooth turning on...");
+                        break;
+                }
+            }
+        }
+    };
 }
