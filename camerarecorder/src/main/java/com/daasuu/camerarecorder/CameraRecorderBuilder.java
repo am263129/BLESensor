@@ -24,8 +24,8 @@ public class CameraRecorderBuilder {
     private Resources resources;
     private Activity activity;
     private CameraRecordListener cameraRecordListener;
-    private int fileWidth = 720;
-    private int fileHeight = 1280;
+    private int fileWidth = 480;
+    private int fileHeight = 640;
     private boolean flipVertical = false;
     private boolean flipHorizontal = false;
     private boolean mute = false;

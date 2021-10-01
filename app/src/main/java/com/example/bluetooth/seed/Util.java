@@ -24,6 +24,7 @@ public class Util {
     public static boolean cameraMode = false;
     public static final int MEDIA_TYPE_IMAGE = 1;
     public static final int MEDIA_TYPE_VIDEO = 2;
+    public static final int DATA_TYPE_CSV = 3;
     public static final String TAG = "Util";
     /** Create a file Uri for saving an image or video */
     public static String getOutputMediaFileUri(int type){
@@ -62,7 +63,11 @@ public class Util {
                     "VID_"+ timeStamp + ".mp4";
 //            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
 //                    "VID_"+ timeStamp + ".mp4");
-        } else {
+        } else if(type == DATA_TYPE_CSV){
+            path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    + "/DATA_"+ timeStamp +".csv";
+        }
+        else {
             return null;
         }
         Log.e("FASA","Return file:"+path);
@@ -102,9 +107,10 @@ public class Util {
         }
     }
 
-    public static void exportData(float[] accel, float[] gyro, float[] compass){
+    public static String exportData(float[] accel, float[] gyro, float[] compass){
         boolean isnew = false;
-        File logFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"sensor_data.csv");
+        String csvPath = getOutputMediaFile(DATA_TYPE_CSV);
+        File logFile = new File(csvPath);
         if (!logFile.exists())
         {
             try
@@ -145,12 +151,14 @@ public class Util {
             }
             buf.newLine();
             buf.close();
+            return csvPath;
         }
         catch (IOException e)
         {
             // TODO Auto-generated catch block
             e.printStackTrace();
             Log.e(TAG, e.toString());
+            return "Failed";
         }
     }
 
