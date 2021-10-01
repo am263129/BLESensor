@@ -1,2 +1,0 @@
-# BLESensor
-bluetooth sensor project

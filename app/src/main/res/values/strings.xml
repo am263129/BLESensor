@@ -1,7 +1,5 @@
 <resources>
-    <string name="app_name">BLESensor</string>
-    <string name="MEMS_DATA">1074beef-8a96-fe1e-c5a5-a27d11f5c777</string>
-    <string name="MEMS_CONF">1074cafe-8a96-fe1e-c5a5-a27d11f5c777</string>
-    <string name="MEMS_POW">107401CE-8a96-fe1e-c5a5-a27d11f5c777</string>
-    <string name="DFU_NOBOND">8EC90003-F315-4F60-9FB8-838830DAEA50</string>
+    <string name="app_name">BLE Sensor</string>
+    <string name="sensor_data">MEMS_CONF</string>
+    <string name="no_bound">DFU_NOBOND</string>
 </resources>
