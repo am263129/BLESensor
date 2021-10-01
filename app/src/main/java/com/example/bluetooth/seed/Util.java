@@ -1,9 +1,13 @@
 package com.example.bluetooth.seed;
 
 
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Half;
 import android.util.Log;
 
@@ -150,11 +154,15 @@ public class Util {
         }
     }
 
-//    public static String toHexString(byte[] value){
-//        String result = "";
-//
-//        return result;
-//    }
+    public static void exportMp4ToGallery(Context context, String filePath) {
+        final ContentValues values = new ContentValues(2);
+        values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+        values.put(MediaStore.Video.Media.DATA, filePath);
+        context.getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                values);
+        context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                Uri.parse("file://" + filePath)));
+    }
 
     public static float[] Half(byte[] data, int offset){
         float[] result = new float[3];

@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
     private DeviceAdapter deviceAdapter;
     private BluetoothDevice WearDev;
     private RecyclerView devicelist;
-    private TextView labelScan;
+    private TextView labelScan, status;
     private ConstraintLayout toggleScan, bgScan;
     private ProgressBar progressBar;
     protected LinearLayoutManager mLayoutManager;
@@ -81,6 +81,12 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
         initScanner();
     }
 
+    @Override
+    protected void onResume() {
+        updateUi();
+        super.onResume();
+    }
+
     public void initUi(){
         modeBLE = findViewById(R.id.mode_ble);
         modeClassic = findViewById(R.id.mode_classic);
@@ -89,6 +95,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
         labelScan = findViewById(R.id.label_scan);
         bgScan = findViewById(R.id.bg_scan);
         noDevice = findViewById(R.id.no_device);
+        status = findViewById(R.id.status);
         deviceAdapter = new DeviceAdapter(bluetoothDevices);
         devicelist.setAdapter(deviceAdapter);
         mLayoutManager = new LinearLayoutManager(this);
@@ -114,11 +121,16 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
     }
 
     public void updateUi(){
-        labelScan.setText(scanning?"Stop":"Scan");
-        bgScan.setBackgroundResource(scanning?R.drawable.ic_stopscan:R.drawable.ic_scanback);
-        toggleScan.setSelected(!scanning);
-        noDevice.setVisibility(bluetoothDevices.size()!=0||scanning?View.GONE:View.VISIBLE);
-    }
+        try {
+            labelScan.setText(scanning ? "Stop" : "Scan");
+            status.setText(bluetoothDevices.size() == 0 ? "No Scanned Device" : "Let's Scan device.");
+            bgScan.setBackgroundResource(scanning ? R.drawable.ic_stopscan : R.drawable.ic_scanback);
+            toggleScan.setSelected(!scanning);
+            noDevice.setVisibility(scanning? View.GONE :bluetoothDevices.size() == 0? View.VISIBLE:View.GONE);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        }
     public void ToggleScan(View view){
         if(SCANMODE == MODE_CLASSIC) {
                 if (scanning) {
@@ -222,6 +234,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
             }
         }
         if(isnew) {
+            status.setText("Device Found");
             bluetoothDevices.add(new BLEDevice(devicename,address));
             MainActivity.this.runOnUiThread(new Runnable() {
                 @Override

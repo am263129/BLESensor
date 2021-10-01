@@ -13,6 +13,7 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -46,12 +47,18 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+
+import com.daasuu.camerarecorder.CameraRecordListener;
+import com.daasuu.camerarecorder.CameraRecorder;
+import com.daasuu.camerarecorder.CameraRecorderBuilder;
+import com.daasuu.camerarecorder.LensFacing;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
-public class DeviceControlActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+public class DeviceControlActivity extends AppCompatActivity {
 
     BluetoothDevice wearDev;
     private String sensorAddress;
@@ -87,6 +94,17 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
     private final String TAG = "ControlActivity";
 
 
+    private SampleGLView sampleGLView;
+    protected CameraRecorder cameraRecorder;
+    private String filepath;
+    private TextView recordBtn;
+    protected LensFacing lensFacing = LensFacing.BACK;
+    protected int cameraWidth = 1280;
+    protected int cameraHeight = 720;
+    protected int videoWidth = 720;
+    protected int videoHeight = 720;
+    private boolean toggleClick = false;
+
     private int CONNECTION_STATUS = -1;
     private final int CONNECTED = 1;
     private final int DISCONNECTED = -1;
@@ -106,14 +124,18 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initUi();
-        initCamera();
-        initRecorder();
         initBluetooth();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+    }
+
+    @Override
+    protected void onPause() {
+        releaseCamera();
+        super.onPause();
     }
 
     @Override
@@ -128,6 +150,7 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
     @Override
     protected void onResume() {
         notifyEnable = true;
+        setUpCamera();
         super.onResume();
     }
 
@@ -188,87 +211,117 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
         deviceName.setText(getIntent().getStringExtra("name") == null ? "Unknown" : getIntent().getStringExtra("name"));
     }
 
-    public void initCamera() {
-        camera = Camera.open();
-        camera.setDisplayOrientation(90);
-        camera.unlock();
-        mPreview = new CameraPreview(this, camera);
-        FrameLayout preview = (FrameLayout) findViewById(R.id.cameraView);
-        preview.addView(mPreview);
-        mholder = mPreview.getHolder();
-        mholder.addCallback(this);
-        mholder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
-        recorder = new MediaRecorder();
-        recorder.setPreviewDisplay(mholder.getSurface());
-    }
 
-    /* init video recorder */
-    private void initRecorder() {
-        recorder.setCamera(camera);
-        recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
-        recorder.setVideoSource(MediaRecorder.VideoSource.DEFAULT);
-        CamcorderProfile cpHigh = CamcorderProfile
-                .get(CamcorderProfile.QUALITY_HIGH);
-        recorder.setProfile(cpHigh);
-        recorder.setOrientationHint(90);
-        // set the size of video.
-        // If the size is not applicable then throw the media recorder stop
-        // -19 error
-        recorder.setOutputFile(Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO));
-//        recorder.setMaxDuration(1800000); // 30 mins
-//        recorder.setMaxFileSize(500000000); // Approximately 500 megabytes
-        recorderReady = true;
-    }
+    private void releaseCamera() {
+        if (sampleGLView != null) {
+            sampleGLView.onPause();
+        }
 
+        if (cameraRecorder != null) {
+            cameraRecorder.stop();
+            cameraRecorder.release();
+            cameraRecorder = null;
+        }
 
-    /* Prepare video recorder */
-    private void prepareRecorder() {
-        recorder.setPreviewDisplay(mholder.getSurface());
-        try {
-            recorder.prepare();
-        } catch (IllegalStateException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (sampleGLView != null) {
+            ((FrameLayout) findViewById(R.id.cameraView)).removeView(sampleGLView);
+            sampleGLView = null;
         }
     }
 
+    private void setUpCameraView() {
+        runOnUiThread(() -> {
+            FrameLayout frameLayout = findViewById(R.id.cameraView);
+            frameLayout.removeAllViews();
+            sampleGLView = null;
+            sampleGLView = new SampleGLView(getApplicationContext());
+            sampleGLView.setTouchListener((event, width, height) -> {
+                if (cameraRecorder == null) return;
+                cameraRecorder.changeManualFocusPoint(event.getX(), event.getY(), width, height);
+            });
+            frameLayout.addView(sampleGLView);
+        });
+    }
+
+    private void setUpCamera() {
+        setUpCameraView();
+
+        cameraRecorder = new CameraRecorderBuilder(this, sampleGLView)
+                //.recordNoFilter(true)
+                .cameraRecordListener(new CameraRecordListener() {
+                    @Override
+                    public void onGetFlashSupport(boolean flashSupport) {
+                        runOnUiThread(() -> {
+//                            findViewById(R.id.btn_flash).setEnabled(flashSupport);
+                        });
+                    }
+
+                    @Override
+                    public void onRecordComplete() {
+                        Util.exportMp4ToGallery(getApplicationContext(), filepath);
+                    }
+
+                    @Override
+                    public void onRecordStart() {
+
+                    }
+
+                    @Override
+                    public void onError(Exception exception) {
+                        Log.e("CameraRecorder", exception.toString());
+                    }
+
+                    @Override
+                    public void onCameraThreadFinish() {
+                        if (toggleClick) {
+                            runOnUiThread(() -> {
+                                setUpCamera();
+                            });
+                        }
+                        toggleClick = false;
+                    }
+                })
+                .videoSize(videoWidth, videoHeight)
+                .cameraSize(cameraWidth, cameraHeight)
+                .lensFacing(lensFacing)
+                .build();
+
+
+    }
+
+    public void recordVideo(View view){
+        if (!recording) {
+            recording = true;
+            filepath = Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO);
+            Log.e("TAG",filepath);
+            cameraRecorder.start(filepath);
+        } else {
+            Toast.makeText(this, "Saving...", Toast.LENGTH_SHORT).show();
+            recording = false;
+            cameraRecorder.stop();
+        }
+        iconRecord.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
+    }
 
     public void initBluetooth() {
         bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
 
-//        try {
-//            wearDev = mBluetoothAdapter.getRemoteDevice(sensorAddress);
-//            if (wearDev == null) {
-//                Toast.makeText(this, "Can't find Sensor device", Toast.LENGTH_SHORT).show();
-//                finish();
-//            }
-//        }catch (Exception e){
-//            e.printStackTrace();
-//        }
-    }
-
-    public void recordVideo(View view) {
-        if (!recorderReady) {
-            Toast.makeText(this, "Unable to capture video.", Toast.LENGTH_SHORT).show();
-        } else {
-            if (recording) {
-                recorder.stop();
-                recording = false;
-                camera.lock();
-                Toast.makeText(this, "Saving...", Toast.LENGTH_SHORT).show();
-                // Let's initRecorder so we can record again
-                initCamera();
-                initRecorder();
-                prepareRecorder();
-            } else {
-                recording = true;
-                recorder.start();
+        try {
+            wearDev = mBluetoothAdapter.getRemoteDevice(sensorAddress);
+            if (wearDev == null) {
+                Toast.makeText(this, "Can't find Sensor device", Toast.LENGTH_SHORT).show();
+                finish();
             }
-            iconRecord.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
+            else{
+                Connect(btnLog);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
         }
     }
+
+
 
     public void updateUI() {
         icoConnect.setBackgroundResource(CONNECTION_STATUS == CONNECTED ? R.drawable.ic_disconnect : R.drawable.ic_connect);
@@ -395,18 +448,22 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
                 & BluetoothGattCharacteristic.PROPERTY_READ) == 0)
             addLog("Sensor data isn't readable");
         else {
-            boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
-            addLog(read ? "Reading Characteristic" : "Reading Characteristic failed");
+
             String target = SensorUUID.lookup(bluetoothGattCharacteristics.get(selected).getUuid().toString(), "other");
             switch (target) {
+                case "TX":
                 case "MEMS_DATA":
-                    addLog("Read data");
+                    addLog("Set Notify Enabled");
+                    mBluetoothGatt.setCharacteristicNotification(bluetoothGattCharacteristics.get(selected), true);
                     break;
                 case "MEMS_CONF":
+                    boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
+                    addLog(read ? "Reading Characteristic" : "Reading Characteristic failed");
                     addLog("Read config");
                     break;
                 case "MEMS_POW":
                     addLog("Enable Indicate");
+//                    mBluetoothGatt.ind(bluetoothGattCharacteristics.get(selected), true);
                     break;
             }
         }
@@ -529,57 +586,7 @@ public class DeviceControlActivity extends AppCompatActivity implements SurfaceH
                                             BluetoothGattCharacteristic characteristic) {
             dspReadCharacteristic(characteristic.getValue());
         }
+
+
     };
-
-
-    @Override
-    public void surfaceCreated(@NonNull SurfaceHolder holder) {
-        if (recorderReady)
-            prepareRecorder();
-        try {
-            camera.setPreviewDisplay(holder);
-            camera.startPreview();
-        } catch (IOException e) {
-            Log.d(TAG, "Error setting camera preview: " + e.getMessage());
-        }
-    }
-
-    @Override
-    public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        if (mholder.getSurface() == null){
-            // preview surface does not exist
-            return;
-        }
-
-
-
-
-
-
-
-
-        try {
-            camera.stopPreview();
-        } catch (Exception e){
-            // ignore: tried to stop a non-existent preview
-        }
-
-        try {
-            camera.setPreviewDisplay(mholder);
-            camera.startPreview();
-
-        } catch (Exception e){
-            Log.d(TAG, "Error starting camera preview: " + e.getMessage());
-        }
-    }
-
-    @Override
-    public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-        if (recording) {
-            recorder.stop();
-            recording = false;
-        }
-        if (recorder != null)
-            recorder.release();
-    }
 }
