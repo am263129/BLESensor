@@ -1,5 +1,31 @@
 <resources>
     <string name="app_name">BLE Sensor</string>
-    <string name="sensor_data">MEMS_CONF</string>
+    <string name="sensor_setting">MEMS_CONF</string>
     <string name="no_bound">DFU_NOBOND</string>
+    <string name="msg_connecting">Connecting to sensor…</string>
+    <string name="msg_disconnecting">Disconnecting from sensor…</string>
+    <string name="msg_connected">Connected to Sensor Device.</string>
+    <string name="msg_getting_services">Attempting to start service discovery:</string>
+    <string name="msg_connect_failed">Connecting Failed</string>
+    <string name="msg_disconnected">Disconnected from Sensor Device</string>
+    <string name="msg_service_getting_failed">Getting service failed</string>
+    <string name="msg_service_found"> services found.</string>
+    <string name="msg_read_setting">Read Setting :</string>
+    <string name="msg_read_data">Read Data :</string>
+    <string name="msg_cha_write_permission_denied">Unable to send data. permission error</string>
+    <string name="msg_read_new_data">Reading data with new setting</string>
+    <string name="msg_read_failed">Reading data failed</string>
+    <string name="msg_no_response">No response, Connection failed</string>
+    <string name="msg_no_characteristic">No characteristics selected</string>
+    <string name="msg_unable_read">Wrong characteristic selected.</string>
+    <string name="msg_enable_indcate">Enable Indicate</string>
+    <string name="msg_reading_config">Reading config</string>
+    <string name="msg_reading_config_data">Reading setting data</string>
+    <string name="msg_reading_config_data_failed">Reading setting data failed</string>
+    <string name="msg_set_notify_enable">Set Notify Enabled</string>
+    <string name="msg_no_sensor_device">Can\'t find Sensor device</string>
+    <string name="btn_scan">Scan</string>
+    <string name="btn_le_scan">LE Scan</string>
+    <string name="btn_classic_scan">Classic Scan</string>
+    <string name="msg_scan_device">Let\'s Scan device.</string>
 </resources>

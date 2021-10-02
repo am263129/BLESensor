@@ -82,7 +82,7 @@ public class Util {
         {
             try
             {
-                logFile.createNewFile();
+                Log.d(TAG,"Create file :"+logFile.createNewFile());
             }
             catch (IOException e)
             {
@@ -107,15 +107,14 @@ public class Util {
         }
     }
 
-    public static String exportData(float[] accel, float[] gyro, float[] compass){
+    public static String exportData(String csvPath,String time,float[] accel, float[] gyro, float[] compass){
         boolean isnew = false;
-        String csvPath = getOutputMediaFile(DATA_TYPE_CSV);
         File logFile = new File(csvPath);
         if (!logFile.exists())
         {
             try
             {
-                logFile.createNewFile();
+                Log.d(TAG,"Create file :"+logFile.createNewFile());
                 isnew = true;
             }
             catch (IOException e)
@@ -136,7 +135,9 @@ public class Util {
             }
             Calendar calendar = Calendar.getInstance();
             SimpleDateFormat simpleDateFormat = new SimpleDateFormat("EEEE dd-MMM-yyyy hh-mm-ss a,");
-            buf.append(simpleDateFormat.format(calendar.getTime()));
+//            buf.append(simpleDateFormat.format(calendar.getTime()));
+            buf.append(time);
+            buf.append(",");
             for(int i =0; i<3; i++){
                 buf.append(String.valueOf(accel[i]));
                 buf.append(",");

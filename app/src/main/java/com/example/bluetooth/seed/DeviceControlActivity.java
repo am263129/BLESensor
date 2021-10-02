@@ -13,7 +13,6 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -24,20 +23,17 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
-import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.hardware.Camera;
-import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.AdapterView;
@@ -56,10 +52,9 @@ import com.daasuu.camerarecorder.CameraRecorder;
 import com.daasuu.camerarecorder.CameraRecorderBuilder;
 import com.daasuu.camerarecorder.LensFacing;
 
-import java.io.IOException;
+import java.io.Console;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
 import java.util.UUID;
 
 public class DeviceControlActivity extends AppCompatActivity {
@@ -100,7 +95,7 @@ public class DeviceControlActivity extends AppCompatActivity {
     private SampleGLView sampleGLView;
     protected CameraRecorder cameraRecorder;
     private String filepath;
-    private TextView recordBtn;
+    private String csvPath;
     protected LensFacing lensFacing = LensFacing.BACK;
     protected int cameraWidth = 1280;
     protected int cameraHeight = 720;
@@ -115,11 +110,14 @@ public class DeviceControlActivity extends AppCompatActivity {
     private boolean saveCsv = true;
     private boolean cameraMode = false;
     private boolean showLog = true;
+    private boolean activityRunning = false;
     private boolean recorderReady = false, recording = false;
-
-
+    private String recordingTime;
+    private long starttime = 0;
     private int deviceWidth;
     private int deviceHeight;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,12 +128,14 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+
         releaseCamera();
         super.onStop();
     }
 
     @Override
     protected void onPause() {
+        activityRunning = false;
         releaseCamera();
         super.onPause();
     }
@@ -151,6 +151,7 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
+        activityRunning = true;
         notifyEnable = true;
         setUpCamera();
         super.onResume();
@@ -213,8 +214,12 @@ public class DeviceControlActivity extends AppCompatActivity {
 
         sensorAddress = getIntent().getStringExtra("address") == null ? "" : getIntent().getStringExtra("address");
         deviceName.setText(getIntent().getStringExtra("name") == null ? "Unknown" : getIntent().getStringExtra("name"));
+
     }
 
+    /**
+     * set free camera, when finish app or after recording finished.
+     */
 
     private void releaseCamera() {
         if (sampleGLView != null) {
@@ -233,6 +238,10 @@ public class DeviceControlActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * setup camera view, for preview video recording.
+     */
+
     private void setUpCameraView() {
         runOnUiThread(() -> {
             FrameLayout frameLayout = findViewById(R.id.cameraView);
@@ -247,9 +256,11 @@ public class DeviceControlActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * setup camera. this called everytime after pause or stop. or record video.
+     */
     private void setUpCamera() {
         setUpCameraView();
-
         cameraRecorder = new CameraRecorderBuilder(this, sampleGLView)
                 //.recordNoFilter(true)
                 .cameraRecordListener(new CameraRecordListener() {
@@ -293,10 +304,16 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * Start/Stop record video
+     * @param view record button
+     */
     public void recordVideo(View view){
         if (!recording) {
+//            starttime = System.currentTimeMillis();
             recording = true;
             filepath = Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO);
+            csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
             Log.e("TAG",filepath);
             cameraRecorder.start(filepath);
         } else {
@@ -310,11 +327,10 @@ public class DeviceControlActivity extends AppCompatActivity {
     public void initBluetooth() {
         bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
-
         try {
             wearDev = mBluetoothAdapter.getRemoteDevice(sensorAddress);
             if (wearDev == null) {
-                Toast.makeText(this, "Can't find Sensor device", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.msg_no_sensor_device), Toast.LENGTH_SHORT).show();
                 finish();
             }
             else{
@@ -331,12 +347,30 @@ public class DeviceControlActivity extends AppCompatActivity {
         icoConnect.setBackgroundResource(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED ? R.drawable.ic_disconnect : R.drawable.ic_connect);
         btnConnect.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED);
         connectingProgress.setVisibility(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED?View.GONE:View.VISIBLE);
+        serviceSpinner.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED);
+        charSpinnner.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED);
     }
 
+    /**
+     * show setting dlg.
+     * @param view setting button on header bar
+     */
     public void showSetting(View view) {
-        configDlg.show();
+        try {
+            if(activityRunning)
+            configDlg.show();
+        }catch (Exception E){
+            E.printStackTrace();
+        }
     }
 
+    public void closeDlg(View view) {
+        if (configDlg.isShowing()) configDlg.dismiss();
+    }
+    /**
+     * Show/Hide camera view.
+     * @param view camera button on header bar
+     */
     public void toggleCamera(View view) {
         cameraMode = !cameraMode;
         btnCamera.setSelected(cameraMode);
@@ -349,15 +383,21 @@ public class DeviceControlActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Hide/Show log view.
+     * @param view log visible button on header bar
+     */
     public void toggleLog(View view) {
         showLog = !showLog;
         btnLog.setBackgroundResource(showLog ? R.drawable.back_active : R.drawable.back_purple);
         logList.setVisibility(showLog ? View.VISIBLE : View.GONE);
     }
 
-    public void closeDlg(View view) {
-        if (configDlg.isShowing()) configDlg.dismiss();
-    }
+
+    /**
+     * write setting config to sensor device.
+     * @param view send button of config dialog.
+     */
 
     public void confirmSetting(View view) {
         if (configDlg.isShowing()) configDlg.dismiss();
@@ -371,7 +411,7 @@ public class DeviceControlActivity extends AppCompatActivity {
         }
         addLog("send setting config to sensor");
         String target = SensorUUID.lookup(bluetoothGattCharacteristics.get(selected).getUuid().toString(), "other");
-        if (!target.equals(getString(R.string.sensor_data)) || !target.equals(getString(R.string.no_bound))) {
+        if (!target.equals(getString(R.string.sensor_setting)) || !target.equals(getString(R.string.no_bound))) {
             Toast.makeText(this, "Unable to send setting to sensor, please select correct characteristics.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -393,17 +433,17 @@ public class DeviceControlActivity extends AppCompatActivity {
                 break;
         }
         if ((bluetoothGattCharacteristics.get(selected).getProperties() & writeProperty) == 0) {
-            addLog("Unable to send data to sensor. permission error");
+            addLog(getString(R.string.msg_cha_write_permission_denied));
             addLog("character uuid: " + bluetoothGattCharacteristics.get(selected) + ", prermission: " + bluetoothGattCharacteristics.get(selected).getProperties());
         } else {
-            if (target.equals("MEMS_CONF")) {
+            if (target.equals(getString(R.string.sensor_setting))) {
                 bluetoothGattCharacteristics.get(selected).setValue(config);
             } else {
                 bluetoothGattCharacteristics.get(selected).setValue(single);
             }
             bluetoothGattCharacteristics.get(selected).setWriteType(WRITE_TYPE_NO_RESPONSE);
             boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
-            addLog(read ? "Reading Characteristic" : "Reading Characteristic failed");
+            addLog(read ? getString(R.string.msg_read_new_data) : getString(R.string.msg_read_failed));
         }
         if (configDlg.isShowing()) configDlg.dismiss();
     }
@@ -444,20 +484,23 @@ public class DeviceControlActivity extends AppCompatActivity {
         DeviceControlActivity.this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-
                 updateUI();
             }
         });
     }
 
+    /**
+     * connect to sensor device
+     * @param view connect button on header bar
+     */
     public void Connect(View view) {
         if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED) {
-            addLog("Disconnecting from sensor...");
+            addLog(getString(R.string.msg_disconnecting));
             mBluetoothGatt.disconnect();
             CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTING;
             updateUI();
         } else {
-            addLog("Connecting to sensor.");
+            addLog(getString(R.string.msg_connecting));
             CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
             mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback);
             updateUI();
@@ -466,7 +509,7 @@ public class DeviceControlActivity extends AppCompatActivity {
                 public void run() {
                     //If still connecting after 5 sec, update ui, and show as unable to connect;
                     if(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING) {
-                        addLog("No response, Connection failed");
+                        addLog(getString(R.string.msg_no_response));
                         CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
                         updateUI();
                     }
@@ -475,33 +518,42 @@ public class DeviceControlActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * read data from sensor with selected characteristic.
+     * @param view read button of config dialog
+     */
     public void Read(View view) {
         if (bluetoothGattCharacteristics.size() == 0) {
-            addLog("unable to read data");
+            addLog(getString(R.string.msg_no_characteristic));
             return;
         }
-        addLog("reading data...");
         Log.e(TAG, bluetoothGattCharacteristics.get(selected).getProperties() + "");
         if ((bluetoothGattCharacteristics.get(selected).getProperties()
                 & BluetoothGattCharacteristic.PROPERTY_READ) == 0)
-            addLog("Sensor data isn't readable");
+            addLog(getString(R.string.msg_unable_read));
         else {
+            if(CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED){
+                Toast.makeText(this,"Sensor diconnected. please connect device",Toast.LENGTH_SHORT).show();
+                return;
+            }
 
             String target = SensorUUID.lookup(bluetoothGattCharacteristics.get(selected).getUuid().toString(), "other");
             switch (target) {
                 case "TX":
                 case "MEMS_DATA":
-                    addLog("Set Notify Enabled");
+                    csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
+                    starttime = System.currentTimeMillis();
+                    addLog(getString(R.string.msg_set_notify_enable));
                     mBluetoothGatt.setCharacteristicNotification(bluetoothGattCharacteristics.get(selected), true);
                     break;
                 case "MEMS_CONF":
-                    addLog("Reading config");
+                    addLog(getString(R.string.msg_reading_config));
                     boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
-                    addLog(read ? "Reading Characteristic" : "Reading Characteristic failed");
+                    addLog(read ? getString(R.string.msg_reading_config_data) : getString(R.string.msg_reading_config_data_failed));
 
                     break;
                 case "MEMS_POW":
-                    addLog("Enable Indicate");
+                    addLog(getString(R.string.msg_enable_indcate));
                     UUID uuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
                     BluetoothGattDescriptor descriptor = bluetoothGattCharacteristics.get(selected).getDescriptor(uuid);
                     descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
@@ -515,12 +567,23 @@ public class DeviceControlActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * set service list as spinner adapter
+     * called when success in read service list
+     */
     public void syncServiceSpinner() {
-        ArrayAdapter<String> serviceAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, services);
-        serviceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        serviceSpinner.setAdapter(serviceAdapter);
+        if(!services.isEmpty()){
+            ArrayAdapter<String> serviceAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, services);
+            serviceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            serviceSpinner.setAdapter(serviceAdapter);
+        }
     }
 
+    /**
+     * set characteristic list as spinner adapter.
+     * callend when service selected.
+     * @param position position of selected service from list
+     */
     public void syncCharacteristicsSpinner(int position) {
         bluetoothGattCharacteristics = bluetoothGattServices.get(position).getCharacteristics();
         characteristics.clear();
@@ -533,6 +596,10 @@ public class DeviceControlActivity extends AppCompatActivity {
         charSpinnner.setAdapter(characteristicsAdapter);
     }
 
+    /**
+     *
+     * @param bytes reading data
+     */
     public void dspReadCharacteristic(byte[] bytes) {
         int len = 1;
         for (int i = 0; i < len; i++) {
@@ -545,7 +612,11 @@ public class DeviceControlActivity extends AppCompatActivity {
                 addLog("Compass  -- x:" + compass[0] + " y:" + compass[1] + " z:" + compass[2]);
             }
             if (saveCsv) {
-                String path = Util.exportData(accel, gyro, compass);
+                long millis = System.currentTimeMillis() - starttime;
+                int millsec = (int) (millis % 1000);
+                int sec = (int) (millis / 1000);
+                recordingTime = sec+"."+millsec;
+                String path = Util.exportData(csvPath,recordingTime,accel, gyro, compass);
                 if(path.equals("Failed")){
                     Log.e(TAG, "Failed");
                 }
@@ -576,22 +647,27 @@ public class DeviceControlActivity extends AppCompatActivity {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 //show setting dialog when connected
-                showSetting(btnLog);
-                addLog("Connected to Sensor Device.");
+                DeviceControlActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        showSetting(btnLog);
+                    }
+                });
+                addLog(getString(R.string.msg_connected));
                 // Attempts to discover services after successful connection.
-                Log.e(TAG, "Attempting to start service discovery:" +
+                Log.e(TAG, getString(R.string.msg_getting_services) +
                         mBluetoothGatt.discoverServices());
                 CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTED;
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 if(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED) {
-                    addLog("Connecting Failed");
+                    addLog(getString(R.string.msg_connect_failed));
                 }else
-                addLog("Disconnected from Sensor Device");
+                addLog(getString(R.string.msg_disconnected));
                 CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
 
             } else if (newState == BluetoothProfile.STATE_CONNECTING){
-                addLog("Connecting to Sensor Device.");
-                CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
+//                addLog(getString(R.string.msg_connecting));
+//                CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
             }
             syncConnectButton();
         }
@@ -599,33 +675,34 @@ public class DeviceControlActivity extends AppCompatActivity {
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.e(TAG, "Success onServicesDiscovered");
-            } else {
-                Log.e(TAG, "onServicesDiscovered received: " + status);
-            }
-            bluetoothGattServices = gatt.getServices();
-            services.clear();
-            for (BluetoothGattService service : bluetoothGattServices) {
-                boolean isnew = true;
-                for (String uuid : services) {
-                    if (uuid.equals(service.getUuid().toString()) || uuid.equals(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()))) {
-                        isnew = false;
-                        break;
+
+                bluetoothGattServices = gatt.getServices();
+                services.clear();
+                addLog(bluetoothGattServices.size() + " " +getString(R.string.msg_service_found));
+                for (BluetoothGattService service : bluetoothGattServices) {
+                    boolean isnew = true;
+                    for (String uuid : services) {
+                        if (uuid.equals(service.getUuid().toString()) || uuid.equals(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()))) {
+                            isnew = false;
+                            break;
+                        }
+                    }
+                    if (isnew) {
+                        services.add(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
+                        addLog("UUID " + SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
                     }
                 }
-                if (isnew)
-                    services.add(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
-            }
-            DeviceControlActivity.this.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    syncServiceSpinner();
-                }
-            });
+                DeviceControlActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        syncServiceSpinner();
+                    }
+                });
 
-            addLog(bluetoothGattServices.size() + " services found.");
-            for (BluetoothGattService service : bluetoothGattServices) {
-                addLog( "UUID" + SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
+
+            }
+            else{
+                addLog(getString(R.string.msg_service_getting_failed));
             }
         }
 
@@ -634,13 +711,12 @@ public class DeviceControlActivity extends AppCompatActivity {
                                          BluetoothGattCharacteristic characteristic,
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                addLog("Data :" + Util.bytesToHex(characteristic.getValue()));
                 if(SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("MEMS_CONF")){
-                    addLog("Read Setting :"+Util.bytesToHex(characteristic.getValue()));
+                    addLog(getString(R.string.msg_read_setting)+Util.bytesToHex(characteristic.getValue()));
                 }
                 else if (SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("TX") && notifyEnable) {
                     gatt.setCharacteristicNotification(characteristic, true);
-                    addLog("Register future notification when data change");
+                    addLog(getString(R.string.msg_read_data) + Util.bytesToHex(characteristic.getValue()));
                 }
             }
         }
