@@ -12,8 +12,7 @@
         android:layout_height="match_parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:visibility="gone"/>
+        app:layout_constraintTop_toTopOf="parent"/>
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
@@ -126,8 +125,8 @@
                 android:onClick="toggleCamera"
                 android:background="@drawable/back_buttons"
                 android:padding="5dp"
+                android:visibility="gone"
                 >
-
                 <ImageView
                     android:id="@+id/icon_camera"
                     app:layout_constraintTop_toTopOf="parent"
@@ -170,8 +169,7 @@
         app:layout_constraintEnd_toEndOf="@id/cameraView"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.95"
-        android:visibility="gone">
+        app:layout_constraintVertical_bias="0.92">
         <ImageView
             android:id="@+id/iconToogle"
             android:layout_width="wrap_content"
@@ -181,9 +179,17 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-
-
-
+    <TextView
+        android:id="@+id/label_record"
+        app:layout_constraintTop_toBottomOf="@+id/btnRecord"
+        app:layout_constraintStart_toStartOf="@+id/btnRecord"
+        app:layout_constraintEnd_toEndOf="@+id/btnRecord"
+        android:textColor="@color/white"
+        android:textStyle="bold"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="25dp"
+        android:text="Start"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

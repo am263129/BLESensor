@@ -37,6 +37,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="10dp"
+            android:visibility="gone"
             >
             <TextView
                 app:layout_constraintTop_toTopOf="parent"
@@ -118,7 +119,8 @@
                 app:layout_constraintEnd_toStartOf="@+id/cbTemperature"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/cbAccell"
-                app:layout_constraintWidth_percent="0.45" />
+                app:layout_constraintWidth_percent="0.45"
+                android:checked="true"/>
 
             <CheckBox
                 android:id="@+id/cbTemperature"

@@ -21,11 +21,11 @@ public class LogItem {
         this.datetime = address;
     }
 
-    public String getAddress() {
+    public String getDateTime() {
         return datetime;
     }
 
-    public String getName() {
+    public String getLog() {
         return message;
     }
 }

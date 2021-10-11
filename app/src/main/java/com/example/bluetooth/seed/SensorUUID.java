@@ -18,7 +18,7 @@ public class SensorUUID {
 
             attributes.put(("0000fe59-0000-1000-8000-00805f9b34fb").toLowerCase(), "DeviceFirmwareUpdate");
             attributes.put(("6E400001-B5A3-F393-E0A9-E50E24DCCA9E").toLowerCase(), "Nordic_UART");
-            attributes.put(("421ecb34-bb49-4b70-a5ea-042c1f38ec32").toLowerCase(), "MEMS_Service");
+            attributes.put(("1074f00d-8a96-fe1e-c5a5-a27d11f5c777").toLowerCase(), "MEMS_Service");
             attributes.put(("1074f0ce-8a96-fe1e-c5a5-a27d11f5c777").toLowerCase(), "TEMP_Service");
             attributes.put(("12345678-1234-5678-1234-56789abcdef0").toLowerCase(), "Bleno_Service");
 

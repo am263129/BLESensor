@@ -139,16 +139,16 @@ public class Util {
             buf.append(time);
             buf.append(",");
             for(int i =0; i<3; i++){
-                buf.append(String.valueOf(accel[i]));
+                buf.append(zeroPrint(accel[i]));
                 buf.append(",");
             }
             for(int i =0; i<3; i++){
-                buf.append(String.valueOf(gyro[i]));
+                buf.append(zeroPrint(gyro[i]));
                 buf.append(",");
             }
             for(int i =0; i<3; i++){
-                buf.append(String.valueOf(compass[i]));
-                buf.append(",");
+                buf.append(zeroPrint(compass[i]));
+                buf.append(i<2?",":"");
             }
             buf.newLine();
             buf.close();
@@ -160,6 +160,15 @@ public class Util {
             e.printStackTrace();
             Log.e(TAG, e.toString());
             return "Failed";
+        }
+    }
+
+    public static String zeroPrint(float value){
+        if(value == 0.0f){
+            return "0";
+        }
+        else{
+            return String.valueOf(value);
         }
     }
 
@@ -175,19 +184,19 @@ public class Util {
 
     public static float[] Half(byte[] data, int offset){
         float[] result = new float[3];
-
         for(int i = 0, j=offset; i< 3; i++, j+=2){
             result[i] = getHalf(new byte[]{data[j],data[j+1]});
         }
         return result;
     }
     public static float getHalf(byte[] buffer){
-        int sign = (byte) ((buffer[0] >> 7) & 1);
-        int storedExponent = (int)buffer[0]<<1>>2;
-        int implicit = (storedExponent == 0)?0:1;
-        float significand = (float)(buffer[0]<<6 & 0xCC0 << 4 | buffer[1]) / 1024f;
-        float result =  (float)Math.pow(-1,(sign)) *(float)Math.pow(2,(storedExponent - 15)) * (float)(implicit + (significand/1024));
-        Log.e("Half data: ",result +"");
+        byte first = buffer[1];
+        byte second = buffer[0];
+        byte sign = (byte)(first>>7);
+        byte stored = (byte)((first & 0x7C) >>2);
+        byte implicit = (byte)((stored==0)?0:1);
+        short significand = (short)(((short)(first & (short)0x0003)<<8) | (short)second);
+        float result = (float)Math.pow(-1,sign) * (float)Math.pow(2,(stored - 15)) * (implicit + (float)(significand/1024f));
         return result;
     }
 

@@ -15,10 +15,14 @@
     <string name="msg_cha_write_permission_denied">Unable to send data. permission error</string>
     <string name="msg_read_new_data">Reading data with new setting</string>
     <string name="msg_read_failed">Reading data failed</string>
+    <string name="msg_writing_config">Setting new config…</string>
+    <string name="msg_write_failed">Setting sensor failed</string>
     <string name="msg_no_response">No response, Connection failed</string>
     <string name="msg_no_characteristic">No characteristics selected</string>
     <string name="msg_unable_read">Wrong characteristic selected.</string>
     <string name="msg_enable_indcate">Enable Indicate</string>
+    <string name="msg_reading_data">Reading sensor data</string>
+    <string name="msg_reading_data_failed">Reading sensor data failed</string>
     <string name="msg_reading_config">Reading config</string>
     <string name="msg_reading_config_data">Reading setting data</string>
     <string name="msg_reading_config_data_failed">Reading setting data failed</string>
@@ -28,4 +32,11 @@
     <string name="btn_le_scan">LE Scan</string>
     <string name="btn_classic_scan">Classic Scan</string>
     <string name="msg_scan_device">Let\'s Scan device.</string>
+    <string name="label_stop">Stop</string>
+    <string name="label_start">Start</string>
+    <string name="msg_stop_failed_undefined_memsdata">Stop Failed. MEMS_DATA is undefined</string>
+    <string name="msg_undefined_descriptor">Descriptor of MEMS_DATA null</string>
+    <string name="config_UUID">00002902-0000-1000-8000-00805f9b34fb</string>
+    <string name="msg_undefined_memsdata">MEMS_DATA not is not defined.</string>
+    <string name="msg_reading_failed">reading data failed</string>
 </resources>

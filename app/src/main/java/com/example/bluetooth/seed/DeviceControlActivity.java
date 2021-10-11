@@ -7,6 +7,8 @@ import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT;
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
 import static android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_SIGNED;
 
+import static com.example.bluetooth.seed.Util.zeroPrint;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
@@ -29,6 +31,7 @@ import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
 import android.hardware.Camera;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -53,6 +56,7 @@ import com.daasuu.camerarecorder.CameraRecorderBuilder;
 import com.daasuu.camerarecorder.LensFacing;
 
 import java.io.Console;
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -66,16 +70,14 @@ public class DeviceControlActivity extends AppCompatActivity {
     private BluetoothGatt mBluetoothGatt;
     private Handler connectHandler = new Handler();
 
-    private List<BluetoothGattService> bluetoothGattServices = new ArrayList<>();
-    private List<BluetoothGattCharacteristic> bluetoothGattCharacteristics = new ArrayList<>();
-    private final ArrayList<String> services = new ArrayList<>();
-    private final ArrayList<String> characteristics = new ArrayList<>();
     private final ArrayList<LogItem> logarray = new ArrayList<>();
     private LogAdapter logAdapter;
     protected LinearLayoutManager mLayoutManager;
 
+    private BluetoothGattCharacteristic memsData;
+    private BluetoothGattCharacteristic memsConf;
 
-    private Spinner serviceSpinner, charSpinnner;
+
     public ImageView icoConnect, iconRecord;
     private TextView deviceName;
     private Dialog configDlg;
@@ -87,8 +89,9 @@ public class DeviceControlActivity extends AppCompatActivity {
     private MediaRecorder recorder;
     private SurfaceHolder mholder;
     private Camera camera;
+    private TextView labelRecord;
 
-    private final int selected = 0;
+    private int selected = 0;
     private final String TAG = "ControlActivity";
 
 
@@ -118,7 +121,6 @@ public class DeviceControlActivity extends AppCompatActivity {
     private int deviceHeight;
 
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -128,21 +130,22 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-
-        releaseCamera();
+        addLog("Activity Stop");
         super.onStop();
     }
 
     @Override
     protected void onPause() {
+        addLog("Activity Pause");
         activityRunning = false;
+        notifyEnable = false;
         releaseCamera();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
-        notifyEnable = false;
+        addLog("Activity Destroy");
         if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED) {
             mBluetoothGatt.disconnect();
         }
@@ -151,6 +154,8 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
+        addLog("Activity Resume");
+        mBluetoothGatt.connect();
         activityRunning = true;
         notifyEnable = true;
         setUpCamera();
@@ -173,6 +178,7 @@ public class DeviceControlActivity extends AppCompatActivity {
         btnCamera = findViewById(R.id.btn_showcamera);
         iconRecord = findViewById(R.id.iconToogle);
         btnConnect = findViewById(R.id.btn_connect);
+        labelRecord = findViewById(R.id.label_record);
         connectingProgress = findViewById(R.id.connecting_progress);
         mLayoutManager = new LinearLayoutManager(this);
         logList.setLayoutManager(mLayoutManager);
@@ -199,18 +205,6 @@ public class DeviceControlActivity extends AppCompatActivity {
         chk_temperature = configDlg.findViewById(R.id.cbTemperature);
         chk_log = configDlg.findViewById(R.id.save_log);
         chk_csv = configDlg.findViewById(R.id.save_csv);
-        serviceSpinner = configDlg.findViewById(R.id.spin_service);
-        charSpinnner = configDlg.findViewById(R.id.spin_characteristics);
-        serviceSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                syncCharacteristicsSpinner(position);
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
 
         sensorAddress = getIntent().getStringExtra("address") == null ? "" : getIntent().getStringExtra("address");
         deviceName.setText(getIntent().getStringExtra("name") == null ? "Unknown" : getIntent().getStringExtra("name"));
@@ -300,28 +294,36 @@ public class DeviceControlActivity extends AppCompatActivity {
                 .cameraSize(cameraWidth, cameraHeight)
                 .lensFacing(lensFacing)
                 .build();
-
-
     }
 
     /**
      * Start/Stop record video
+     *
      * @param view record button
      */
-    public void recordVideo(View view){
+    public void recordVideo(View view) {
         if (!recording) {
-//            starttime = System.currentTimeMillis();
+            if (memsData == null) {
+                Toast.makeText(this, "Unable to read mems data. try reconnect to sensor.", Toast.LENGTH_SHORT).show();
+                addLog("MEMS_DATA undefined.");
+                return;
+            }
+            starttime = System.currentTimeMillis();
             recording = true;
             filepath = Util.getOutputMediaFile(Util.MEDIA_TYPE_VIDEO);
             csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
-            Log.e("TAG",filepath);
+            Log.e(TAG, filepath);
             cameraRecorder.start(filepath);
+            startReadMemsData(memsData);
         } else {
-            Toast.makeText(this, "Saving...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Saving. mp4 file path:"+ filepath.split("/")[filepath.split("/").length-1]
+                    + "\n csv file path:"+ csvPath.split("/")[csvPath.split("/").length-1], Toast.LENGTH_LONG).show();
             recording = false;
             cameraRecorder.stop();
+            stopReadMemsData();
         }
         iconRecord.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
+        labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));
     }
 
     public void initBluetooth() {
@@ -332,34 +334,30 @@ public class DeviceControlActivity extends AppCompatActivity {
             if (wearDev == null) {
                 Toast.makeText(this, getString(R.string.msg_no_sensor_device), Toast.LENGTH_SHORT).show();
                 finish();
-            }
-            else{
+            } else {
                 Connect(btnLog);
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-
-
     public void updateUI() {
         icoConnect.setBackgroundResource(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED ? R.drawable.ic_disconnect : R.drawable.ic_connect);
         btnConnect.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED);
-        connectingProgress.setVisibility(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED?View.GONE:View.VISIBLE);
-        serviceSpinner.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED);
-        charSpinnner.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED);
+        connectingProgress.setVisibility(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED ? View.GONE : View.VISIBLE);
     }
 
     /**
      * show setting dlg.
+     *
      * @param view setting button on header bar
      */
     public void showSetting(View view) {
         try {
-            if(activityRunning)
-            configDlg.show();
-        }catch (Exception E){
+            if (activityRunning)
+                configDlg.show();
+        } catch (Exception E) {
             E.printStackTrace();
         }
     }
@@ -367,8 +365,10 @@ public class DeviceControlActivity extends AppCompatActivity {
     public void closeDlg(View view) {
         if (configDlg.isShowing()) configDlg.dismiss();
     }
+
     /**
      * Show/Hide camera view.
+     *
      * @param view camera button on header bar
      */
     public void toggleCamera(View view) {
@@ -385,6 +385,7 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     /**
      * Hide/Show log view.
+     *
      * @param view log visible button on header bar
      */
     public void toggleLog(View view) {
@@ -396,6 +397,7 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     /**
      * write setting config to sensor device.
+     *
      * @param view send button of config dialog.
      */
 
@@ -405,18 +407,14 @@ public class DeviceControlActivity extends AppCompatActivity {
         byte[] single = {0x01};
         saveLog = chk_log.isChecked();
         saveCsv = chk_csv.isChecked();
-        if (bluetoothGattCharacteristics.size() == 0) {
-            addLog("unable to write setting");
-            return;
-        }
+
         addLog("send setting config to sensor");
-        String target = SensorUUID.lookup(bluetoothGattCharacteristics.get(selected).getUuid().toString(), "other");
-        if (!target.equals(getString(R.string.sensor_setting)) || !target.equals(getString(R.string.no_bound))) {
-            Toast.makeText(this, "Unable to send setting to sensor, please select correct characteristics.", Toast.LENGTH_SHORT).show();
+        if (memsConf == null) {
+            addLog("MEMS_CONF undefined");
             return;
         }
-        Log.e(TAG, bluetoothGattCharacteristics.get(selected).getProperties() + "");
-        int writeType = bluetoothGattCharacteristics.get(selected).getProperties();
+        Log.e(TAG, memsConf.getProperties() + "");
+        int writeType = memsConf.getProperties();
         int writeProperty;
         switch (writeType) {
             case WRITE_TYPE_DEFAULT:
@@ -432,18 +430,14 @@ public class DeviceControlActivity extends AppCompatActivity {
                 writeProperty = 0;
                 break;
         }
-        if ((bluetoothGattCharacteristics.get(selected).getProperties() & writeProperty) == 0) {
+        if ((memsConf.getProperties() & writeProperty) == 0) {
             addLog(getString(R.string.msg_cha_write_permission_denied));
-            addLog("character uuid: " + bluetoothGattCharacteristics.get(selected) + ", prermission: " + bluetoothGattCharacteristics.get(selected).getProperties());
+            addLog("character uuid: " + memsConf + ", prermission: " + memsConf.getProperties());
         } else {
-            if (target.equals(getString(R.string.sensor_setting))) {
-                bluetoothGattCharacteristics.get(selected).setValue(config);
-            } else {
-                bluetoothGattCharacteristics.get(selected).setValue(single);
-            }
-            bluetoothGattCharacteristics.get(selected).setWriteType(WRITE_TYPE_NO_RESPONSE);
-            boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
-            addLog(read ? getString(R.string.msg_read_new_data) : getString(R.string.msg_read_failed));
+            memsConf.setValue(config);
+            memsConf.setWriteType(WRITE_TYPE_NO_RESPONSE);
+            boolean write = mBluetoothGatt.writeCharacteristic(memsConf);
+            addLog(write ? getString(R.string.msg_writing_config) : getString(R.string.msg_write_failed));
         }
         if (configDlg.isShowing()) configDlg.dismiss();
     }
@@ -470,15 +464,8 @@ public class DeviceControlActivity extends AppCompatActivity {
      * @return string config
      */
     public void syncConfig(byte[] data) {
-        String config = (chk_acell.isChecked() ? "AA" : "55") + " "
-                + (chk_gyro.isChecked() ? "AA" : "55") + " "
-                + (chk_compass.isChecked() ? "AA" : "55") + " "
-                + (chk_temperature.isChecked() ? "AA" : "55") + " "
-                + Integer.toString(20, 16) + " "
-                + Integer.toString(200, 16);
-        addLog("config : " + config);
+        addLog("config read: " + Util.bytesToHex(data));
     }
-
 
     private void syncConnectButton() {
         DeviceControlActivity.this.runOnUiThread(new Runnable() {
@@ -491,113 +478,73 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     /**
      * connect to sensor device
+     *
      * @param view connect button on header bar
      */
     public void Connect(View view) {
         if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED) {
             addLog(getString(R.string.msg_disconnecting));
             mBluetoothGatt.disconnect();
+            memsConf = null;
+            memsData = null;
             CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTING;
             updateUI();
         } else {
             addLog(getString(R.string.msg_connecting));
             CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
-            mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
+            } else {
+                mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback);
+            }
             updateUI();
             connectHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     //If still connecting after 5 sec, update ui, and show as unable to connect;
-                    if(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING) {
+                    if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING) {
                         addLog(getString(R.string.msg_no_response));
                         CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
                         updateUI();
                     }
                 }
-            },8000);
+            }, 8000);
         }
     }
 
     /**
      * read data from sensor with selected characteristic.
+     *
      * @param view read button of config dialog
      */
     public void Read(View view) {
-        if (bluetoothGattCharacteristics.size() == 0) {
-            addLog(getString(R.string.msg_no_characteristic));
-            return;
-        }
-        Log.e(TAG, bluetoothGattCharacteristics.get(selected).getProperties() + "");
-        if ((bluetoothGattCharacteristics.get(selected).getProperties()
+        if ((memsData.getProperties()
                 & BluetoothGattCharacteristic.PROPERTY_READ) == 0)
             addLog(getString(R.string.msg_unable_read));
         else {
-            if(CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED){
-                Toast.makeText(this,"Sensor diconnected. please connect device",Toast.LENGTH_SHORT).show();
+            if (CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED) {
+                Toast.makeText(this, "Sensor disconnected. please connect device", Toast.LENGTH_SHORT).show();
+                addLog("Sensor disconnected. please connect device");
                 return;
             }
-
-            String target = SensorUUID.lookup(bluetoothGattCharacteristics.get(selected).getUuid().toString(), "other");
-            switch (target) {
-                case "TX":
-                case "MEMS_DATA":
-                    csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
-                    starttime = System.currentTimeMillis();
-                    addLog(getString(R.string.msg_set_notify_enable));
-                    mBluetoothGatt.setCharacteristicNotification(bluetoothGattCharacteristics.get(selected), true);
-                    break;
-                case "MEMS_CONF":
-                    addLog(getString(R.string.msg_reading_config));
-                    boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
-                    addLog(read ? getString(R.string.msg_reading_config_data) : getString(R.string.msg_reading_config_data_failed));
-
-                    break;
-                case "MEMS_POW":
-                    addLog(getString(R.string.msg_enable_indcate));
-                    UUID uuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-                    BluetoothGattDescriptor descriptor = bluetoothGattCharacteristics.get(selected).getDescriptor(uuid);
-                    descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
-                    mBluetoothGatt.writeDescriptor(descriptor);
-                    mBluetoothGatt.setCharacteristicNotification(bluetoothGattCharacteristics.get(selected), true);
-//                    mBluetoothGatt.ind(bluetoothGattCharacteristics.get(selected), true);
-                    break;
+            //read data without recording.
+            if (memsData != null && !recording)
+                startReadMemsData(memsData);
+            else{
+                addLog(getString(R.string.msg_undefined_memsdata));
             }
+//            else if(target.equals("MEMS_CONF")){
+//                addLog(getString(R.string.msg_reading_config));
+//                boolean read = mBluetoothGatt.readCharacteristic(bluetoothGattCharacteristics.get(selected));
+//                addLog(read ? getString(R.string.msg_reading_config_data) : getString(R.string.msg_reading_config_data_failed));
+//            }
         }
         if (configDlg.isShowing()) configDlg.dismiss();
     }
 
 
-    /**
-     * set service list as spinner adapter
-     * called when success in read service list
-     */
-    public void syncServiceSpinner() {
-        if(!services.isEmpty()){
-            ArrayAdapter<String> serviceAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, services);
-            serviceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            serviceSpinner.setAdapter(serviceAdapter);
-        }
-    }
 
     /**
-     * set characteristic list as spinner adapter.
-     * callend when service selected.
-     * @param position position of selected service from list
-     */
-    public void syncCharacteristicsSpinner(int position) {
-        bluetoothGattCharacteristics = bluetoothGattServices.get(position).getCharacteristics();
-        characteristics.clear();
-        for (BluetoothGattCharacteristic characteristic : bluetoothGattCharacteristics) {
-            String name = SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString());
-            characteristics.add(name);
-            addLog("Enabled characteristics: "+name);
-        }
-        ArrayAdapter<String> characteristicsAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, characteristics);
-        charSpinnner.setAdapter(characteristicsAdapter);
-    }
-
-    /**
-     *
      * @param bytes reading data
      */
     public void dspReadCharacteristic(byte[] bytes) {
@@ -606,26 +553,62 @@ public class DeviceControlActivity extends AppCompatActivity {
             float[] accel = Util.Half(bytes, (i * 20) + (0 * 6 + 1));
             float[] gyro = Util.Half(bytes, (i * 20) + (1 * 6 + 1));
             float[] compass = Util.Half(bytes, (i * 20) + (2 * 6 + 1));
-            for (int j = 0; j < 3; j++) {
-                addLog("Accel -- x:" + accel[0] + " y:" + accel[1] + " z:" + accel[2]);
-                addLog("Gyro  -- x:" + gyro[0] + " y:" + gyro[1] + " z:" + gyro[2]);
-                addLog("Compass  -- x:" + compass[0] + " y:" + compass[1] + " z:" + compass[2]);
-            }
+
+            addLog("Accel -- x:" + zeroPrint(accel[0]) + " y:" + zeroPrint(accel[1]) + " z:" + zeroPrint(accel[2]));
+            addLog("Gyro  -- x:" + zeroPrint(gyro[0]) + " y:" + zeroPrint(gyro[1]) + " z:" + zeroPrint(gyro[2]));
+            addLog("Compass  -- x:" + zeroPrint(compass[0]) + " y:" + zeroPrint(compass[1]) + " z:" + zeroPrint(compass[2]));
             if (saveCsv) {
                 long millis = System.currentTimeMillis() - starttime;
                 int millsec = (int) (millis % 1000);
                 int sec = (int) (millis / 1000);
-                recordingTime = sec+"."+millsec;
-                String path = Util.exportData(csvPath,recordingTime,accel, gyro, compass);
-                if(path.equals("Failed")){
-                    Log.e(TAG, "Failed");
+                recordingTime = sec + "." + millsec;
+                if(csvPath == null){
+                    starttime = System.currentTimeMillis();
+                    csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
                 }
-                else {
-                    Log.e(TAG, "Success, path:"+path);
+                String path = Util.exportData(csvPath, recordingTime, accel, gyro, compass);
+                if (path.equals("Failed")) {
+                    Log.e(TAG, "Failed");
+                } else {
+                    Log.e(TAG, "Success, path:" + path);
                 }
             }
         }
     }
+
+
+    public void startReadMemsData(BluetoothGattCharacteristic memsdata) {
+        addLog(getString(R.string.msg_set_notify_enable));
+        boolean result = mBluetoothGatt.setCharacteristicNotification(memsdata, true);
+        addLog("set setCharacteristicNotification result: " + result);
+        UUID uuid = UUID.fromString(getString(R.string.config_UUID));
+        BluetoothGattDescriptor descriptor = memsdata.getDescriptor(uuid);
+        if (descriptor != null) {
+            descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            boolean descriptor_result = mBluetoothGatt.writeDescriptor(descriptor);
+            addLog("Set writeDescriptor result(enable): " + descriptor_result);
+        } else {
+            addLog(getString(R.string.msg_undefined_descriptor));
+        }
+    }
+    public void stopReadMemsData(){
+        if(memsData == null){
+            addLog(getString(R.string.msg_stop_failed_undefined_memsdata));
+            return;
+        }
+        boolean result = mBluetoothGatt.setCharacteristicNotification(memsData, false);
+        addLog("set setCharacteristicNotification result: " + result);
+        UUID uuid = UUID.fromString(getString(R.string.config_UUID));
+        BluetoothGattDescriptor descriptor = memsData.getDescriptor(uuid);
+        if (descriptor != null) {
+            descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+            boolean descriptor_result = mBluetoothGatt.writeDescriptor(descriptor);
+            addLog("Set writeDescriptor result(disable): " + descriptor_result);
+        } else {
+            addLog("Descriptor of MEMS_DATA null");
+        }
+    }
+
 
     private void addLog(String msg) {
         DeviceControlActivity.this.runOnUiThread(new Runnable() {
@@ -646,28 +629,21 @@ public class DeviceControlActivity extends AppCompatActivity {
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                //show setting dialog when connected
-                DeviceControlActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        showSetting(btnLog);
-                    }
-                });
+
                 addLog(getString(R.string.msg_connected));
                 // Attempts to discover services after successful connection.
                 Log.e(TAG, getString(R.string.msg_getting_services) +
                         mBluetoothGatt.discoverServices());
                 CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTED;
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                if(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED) {
+                if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED) {
                     addLog(getString(R.string.msg_connect_failed));
-                }else
-                addLog(getString(R.string.msg_disconnected));
+                } else
+                    addLog(getString(R.string.msg_disconnected));
                 CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
 
-            } else if (newState == BluetoothProfile.STATE_CONNECTING){
-//                addLog(getString(R.string.msg_connecting));
-//                CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
+            } else if (newState == BluetoothProfile.STATE_CONNECTING) {
+                addLog(getString(R.string.msg_connecting));
             }
             syncConnectButton();
         }
@@ -676,32 +652,26 @@ public class DeviceControlActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
 
-                bluetoothGattServices = gatt.getServices();
-                services.clear();
-                addLog(bluetoothGattServices.size() + " " +getString(R.string.msg_service_found));
+                List<BluetoothGattService> bluetoothGattServices = gatt.getServices();
+                addLog(bluetoothGattServices.size() + " " + getString(R.string.msg_service_found));
                 for (BluetoothGattService service : bluetoothGattServices) {
-                    boolean isnew = true;
-                    for (String uuid : services) {
-                        if (uuid.equals(service.getUuid().toString()) || uuid.equals(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()))) {
-                            isnew = false;
-                            break;
-                        }
-                    }
-                    if (isnew) {
-                        services.add(SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
-                        addLog("UUID " + SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString()));
-                    }
+                        String newService = SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString());
+                        addLog("Service" +
+                                " UUID " + newService);
+//                        if (newService.equals("MEMS_Service") || newService.equals("1074f00d-8a96-fe1e-c5a5-a27d11f5c777")) {
+                            //found mems data service, set selected service to mems data service.
+                            for( BluetoothGattCharacteristic characteristic : service.getCharacteristics()){
+                                String name = SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString());
+                                if(name.equals("MEMS_DATA")){
+                                    memsData = characteristic;
+                                }
+                                else if(name.equals("MEMS_CONF")){
+                                    memsConf = characteristic;
+                                }
+                            }
+//                        }
                 }
-                DeviceControlActivity.this.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        syncServiceSpinner();
-                    }
-                });
-
-
-            }
-            else{
+            } else {
                 addLog(getString(R.string.msg_service_getting_failed));
             }
         }
@@ -711,22 +681,25 @@ public class DeviceControlActivity extends AppCompatActivity {
                                          BluetoothGattCharacteristic characteristic,
                                          int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                if(SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("MEMS_CONF")){
-                    addLog(getString(R.string.msg_read_setting)+Util.bytesToHex(characteristic.getValue()));
+                addLog("Read data:" + Util.bytesToHex(characteristic.getValue()));
+                if (SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("MEMS_CONF")) {
+                    addLog(getString(R.string.msg_read_setting) + Util.bytesToHex(characteristic.getValue()));
+                } else if (SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("MEMS_DATA")) {
+                    gatt.setCharacteristicNotification(characteristic, notifyEnable);
                 }
-                else if (SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("TX") && notifyEnable) {
-                    gatt.setCharacteristicNotification(characteristic, true);
-                    addLog(getString(R.string.msg_read_data) + Util.bytesToHex(characteristic.getValue()));
-                }
+            } else {
+                addLog(getString(R.string.msg_reading_failed));
             }
         }
 
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
-            dspReadCharacteristic(characteristic.getValue());
+            addLog("data received from change listener:" + Util.bytesToHex(characteristic.getValue()));
+            if (SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString()).equals("MEMS_DATA")) {
+                addLog("MEMS_DATA : " + Util.bytesToHex(characteristic.getValue()));
+                dspReadCharacteristic(characteristic.getValue());
+            }
         }
-
-
     };
 }

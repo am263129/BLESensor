@@ -8,13 +8,11 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.widget.Toast;
 
 public class SplashActivity extends AppCompatActivity {
@@ -82,7 +80,7 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     public void startMain(){
-        Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+        Intent intent = new Intent(SplashActivity.this, DeviceScanActivity.class);
         startActivity(intent);
         finish();
     }
