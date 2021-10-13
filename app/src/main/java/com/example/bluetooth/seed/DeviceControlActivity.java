@@ -25,7 +25,10 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.drawable.ColorDrawable;
@@ -56,6 +59,7 @@ import com.daasuu.camerarecorder.CameraRecorderBuilder;
 import com.daasuu.camerarecorder.LensFacing;
 
 import java.io.Console;
+import java.lang.reflect.Method;
 import java.sql.Array;
 import java.util.ArrayList;
 import java.util.List;
@@ -121,26 +125,29 @@ public class DeviceControlActivity extends AppCompatActivity {
     private int deviceHeight;
 
 
+    String BLE_PIN = "1234";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initUi();
         initBluetooth();
+        registerReceiver();
     }
 
     @Override
     protected void onStop() {
-        addLog("Activity Stop");
         super.onStop();
+        addLog("Activity Stop");
     }
 
     @Override
     protected void onPause() {
+        super.onPause();
         addLog("Activity Pause");
         activityRunning = false;
         notifyEnable = false;
         releaseCamera();
-        super.onPause();
     }
 
     @Override
@@ -154,12 +161,20 @@ public class DeviceControlActivity extends AppCompatActivity {
 
     @Override
     protected void onResume() {
+        super.onResume();
         addLog("Activity Resume");
-        mBluetoothGatt.connect();
+        if(CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED)
+        connectHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                btnConnect.callOnClick();
+            }
+        });
+        if (mBluetoothGatt != null)
+            mBluetoothGatt.connect();
         activityRunning = true;
         notifyEnable = true;
         setUpCamera();
-        super.onResume();
     }
 
     @Override
@@ -316,8 +331,8 @@ public class DeviceControlActivity extends AppCompatActivity {
             cameraRecorder.start(filepath);
             startReadMemsData(memsData);
         } else {
-            Toast.makeText(this, "Saving. mp4 file path:"+ filepath.split("/")[filepath.split("/").length-1]
-                    + "\n csv file path:"+ csvPath.split("/")[csvPath.split("/").length-1], Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Saving. mp4 file path:" + filepath.split("/")[filepath.split("/").length - 1]
+                    + "\n csv file path:" + csvPath.split("/")[csvPath.split("/").length - 1], Toast.LENGTH_LONG).show();
             recording = false;
             cameraRecorder.stop();
             stopReadMemsData();
@@ -326,6 +341,10 @@ public class DeviceControlActivity extends AppCompatActivity {
         labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));
     }
 
+    /**
+     * init bluetooth and connect to ble device.
+     * (just click connect button. programmatically)
+     */
     public void initBluetooth() {
         bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
@@ -333,15 +352,16 @@ public class DeviceControlActivity extends AppCompatActivity {
             wearDev = mBluetoothAdapter.getRemoteDevice(sensorAddress);
             if (wearDev == null) {
                 Toast.makeText(this, getString(R.string.msg_no_sensor_device), Toast.LENGTH_SHORT).show();
-                finish();
-            } else {
-                Connect(btnLog);
+                finish();//if bluetooth is disabled, don't to continue anymore.
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Sync connect button status with sensor device connection status.
+     */
     public void updateUI() {
         icoConnect.setBackgroundResource(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED ? R.drawable.ic_disconnect : R.drawable.ic_connect);
         btnConnect.setEnabled(CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTED || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED);
@@ -467,14 +487,6 @@ public class DeviceControlActivity extends AppCompatActivity {
         addLog("config read: " + Util.bytesToHex(data));
     }
 
-    private void syncConnectButton() {
-        DeviceControlActivity.this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                updateUI();
-            }
-        });
-    }
 
     /**
      * connect to sensor device
@@ -488,16 +500,14 @@ public class DeviceControlActivity extends AppCompatActivity {
             memsConf = null;
             memsData = null;
             CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTING;
-            updateUI();
         } else {
             addLog(getString(R.string.msg_connecting));
             CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTING;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback, BluetoothDevice.TRANSPORT_LE);
+                mBluetoothGatt = wearDev.connectGatt(this, true, mGattCallback, BluetoothDevice.TRANSPORT_LE);
             } else {
-                mBluetoothGatt = wearDev.connectGatt(this, false, mGattCallback);
+                mBluetoothGatt = wearDev.connectGatt(this, true, mGattCallback);
             }
-            updateUI();
             connectHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -510,10 +520,14 @@ public class DeviceControlActivity extends AppCompatActivity {
                 }
             }, 8000);
         }
+        updateUI();
     }
 
     /**
+     * !! Deprecated !!
+     * <p>
      * read data from sensor with selected characteristic.
+     * (remove read button from 1.12, read data only with video recording.)
      *
      * @param view read button of config dialog
      */
@@ -530,7 +544,7 @@ public class DeviceControlActivity extends AppCompatActivity {
             //read data without recording.
             if (memsData != null && !recording)
                 startReadMemsData(memsData);
-            else{
+            else {
                 addLog(getString(R.string.msg_undefined_memsdata));
             }
 //            else if(target.equals("MEMS_CONF")){
@@ -543,8 +557,9 @@ public class DeviceControlActivity extends AppCompatActivity {
     }
 
 
-
     /**
+     * analyze byte data from ble sensor device
+     *
      * @param bytes reading data
      */
     public void dspReadCharacteristic(byte[] bytes) {
@@ -562,7 +577,7 @@ public class DeviceControlActivity extends AppCompatActivity {
                 int millsec = (int) (millis % 1000);
                 int sec = (int) (millis / 1000);
                 recordingTime = sec + "." + millsec;
-                if(csvPath == null){
+                if (csvPath == null) {
                     starttime = System.currentTimeMillis();
                     csvPath = Util.getOutputMediaFile(Util.DATA_TYPE_CSV);
                 }
@@ -577,6 +592,11 @@ public class DeviceControlActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Read data from sensor device,
+     *
+     * @param memsdata MEMS_DATA characteristic
+     */
     public void startReadMemsData(BluetoothGattCharacteristic memsdata) {
         addLog(getString(R.string.msg_set_notify_enable));
         boolean result = mBluetoothGatt.setCharacteristicNotification(memsdata, true);
@@ -591,8 +611,12 @@ public class DeviceControlActivity extends AppCompatActivity {
             addLog(getString(R.string.msg_undefined_descriptor));
         }
     }
-    public void stopReadMemsData(){
-        if(memsData == null){
+
+    /**
+     * Stop reading data from sensor device.
+     */
+    public void stopReadMemsData() {
+        if (memsData == null) {
             addLog(getString(R.string.msg_stop_failed_undefined_memsdata));
             return;
         }
@@ -610,6 +634,11 @@ public class DeviceControlActivity extends AppCompatActivity {
     }
 
 
+    /**
+     * Show log on the screen and print log file if enabled.
+     *
+     * @param msg
+     */
     private void addLog(String msg) {
         DeviceControlActivity.this.runOnUiThread(new Runnable() {
             @Override
@@ -623,56 +652,98 @@ public class DeviceControlActivity extends AppCompatActivity {
             Util.printLog(msg);
     }
 
+    private void registerReceiver() {
+        IntentFilter intentFilter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+        intentFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        registerReceiver(broadCastReceiver, intentFilter);
+    }
+
+
+    /**
+     * Broadcast receiver to receive bluetooth pairing request and bond state changed event.
+     * (unregister receiver when successfully bond.)
+     */
+    private BroadcastReceiver broadCastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
+                addLog("Sensor Device is requesting pair");
+                BluetoothDevice bluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 1234);
+                addLog("Pin Code:" + pin);
+                bluetoothDevice.setPin((pin + "").getBytes());
+                bluetoothDevice.setPairingConfirmation(true);
+                bluetoothDevice.createBond();
+                addLog("pin entered and request sent...");
+            }
+            if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                final int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR);
+                final int prevState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, BluetoothDevice.ERROR);
+                if (state == BluetoothDevice.BOND_BONDED && prevState == BluetoothDevice.BOND_BONDING) {
+                    addLog("Paired");
+                    DeviceControlActivity.this.unregisterReceiver(this);
+                } else if (state == BluetoothDevice.BOND_NONE && prevState == BluetoothDevice.BOND_BONDED) {
+                    addLog("Unpaired");
+                }
+            }
+        }
+    };
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-
                 addLog(getString(R.string.msg_connected));
                 // Attempts to discover services after successful connection.
-                Log.e(TAG, getString(R.string.msg_getting_services) +
-                        mBluetoothGatt.discoverServices());
-                CONNECTION_STATUS = BluetoothProfile.STATE_CONNECTED;
+                boolean result = mBluetoothGatt.discoverServices();
+                addLog(getString(R.string.msg_getting_services) + " result: " + result);
+            } else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION) {
+                addLog("Device is unable to communicate due to unpaired");
+                if (gatt.getDevice().getBondState() == BluetoothDevice.BOND_NONE) {
+                    // The broadcast receiver should be called.
+                    addLog("Request Bond");
+                } else {
+                    addLog("already bond");
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 if (CONNECTION_STATUS == BluetoothProfile.STATE_CONNECTING || CONNECTION_STATUS == BluetoothProfile.STATE_DISCONNECTED) {
                     addLog(getString(R.string.msg_connect_failed));
                 } else
                     addLog(getString(R.string.msg_disconnected));
-                CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
-
             } else if (newState == BluetoothProfile.STATE_CONNECTING) {
                 addLog(getString(R.string.msg_connecting));
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTING){
+                addLog(getString(R.string.msg_disconnecting));
             }
-            syncConnectButton();
+            CONNECTION_STATUS = newState;
+            updateUI();
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-
                 List<BluetoothGattService> bluetoothGattServices = gatt.getServices();
                 addLog(bluetoothGattServices.size() + " " + getString(R.string.msg_service_found));
                 for (BluetoothGattService service : bluetoothGattServices) {
-                        String newService = SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString());
-                        addLog("Service" +
-                                " UUID " + newService);
-//                        if (newService.equals("MEMS_Service") || newService.equals("1074f00d-8a96-fe1e-c5a5-a27d11f5c777")) {
-                            //found mems data service, set selected service to mems data service.
-                            for( BluetoothGattCharacteristic characteristic : service.getCharacteristics()){
-                                String name = SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString());
-                                if(name.equals("MEMS_DATA")){
-                                    memsData = characteristic;
-                                }
-                                else if(name.equals("MEMS_CONF")){
-                                    memsConf = characteristic;
-                                }
-                            }
-//                        }
+                    String newService = SensorUUID.lookup(service.getUuid().toString(), service.getUuid().toString());
+                    addLog("Service" + " UUID " + newService);
+                    for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
+                        String name = SensorUUID.lookup(characteristic.getUuid().toString(), characteristic.getUuid().toString());
+                        if (name.equals("MEMS_DATA")) {
+                            memsData = characteristic;
+                        } else if (name.equals("MEMS_CONF")) {
+                            memsConf = characteristic;
+                        }
+                    }
+                    if(memsData != null && memsConf != null){
+                        addLog("Sensor device is ready.");
+                    }
                 }
             } else {
-                addLog(getString(R.string.msg_service_getting_failed));
+                addLog(getString(R.string.msg_service_getting_failed) +  " with status: " + status);
             }
         }
 
@@ -688,7 +759,7 @@ public class DeviceControlActivity extends AppCompatActivity {
                     gatt.setCharacteristicNotification(characteristic, notifyEnable);
                 }
             } else {
-                addLog(getString(R.string.msg_reading_failed));
+                addLog(getString(R.string.msg_reading_failed) + " with status: " + status);
             }
         }
 

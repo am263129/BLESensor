@@ -177,7 +177,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Read"
-            android:onClick="Read"/>
+            android:onClick="Read"
+            android:visibility="gone"/>
         <Button
             app:layout_constraintTop_toBottomOf="@id/file_setting"
             app:layout_constraintBottom_toBottomOf="parent"
