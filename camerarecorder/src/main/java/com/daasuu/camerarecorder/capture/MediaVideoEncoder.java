@@ -21,7 +21,7 @@ public class MediaVideoEncoder extends MediaEncoder {
 
     private static final String MIME_TYPE = "video/avc";
     // parameters for recording
-    private static final int FRAME_RATE = 30;
+    private static final int FRAME_RATE = 20;
     private static final float BPP = 0.25f;
 
     private final int fileWidth;
@@ -94,6 +94,7 @@ public class MediaVideoEncoder extends MediaEncoder {
         Log.i(TAG, "format: " + format);
 
         mediaCodec = MediaCodec.createEncoderByType(MIME_TYPE);
+
 
         mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         // get Surface for encoder input
@@ -168,6 +169,7 @@ public class MediaVideoEncoder extends MediaEncoder {
         }
         return null;
     }
+
 
     /**
      * select color format available on specific codec and we can use.

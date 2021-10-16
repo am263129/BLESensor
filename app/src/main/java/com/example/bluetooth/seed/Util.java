@@ -21,145 +21,192 @@ import java.util.Date;
 
 public class Util {
 
-    public static boolean cameraMode = false;
-    public static final int MEDIA_TYPE_IMAGE = 1;
-    public static final int MEDIA_TYPE_VIDEO = 2;
-    public static final int DATA_TYPE_CSV = 3;
     public static final String TAG = "Util";
+
+    private static BufferedWriter csvWriter = null;
+    private static BufferedWriter logWriter = null;
+
+    private static String csvFilePath = null;
+    private static String csvFileName = null;
+
+    private static String logFilePath = null;
+    private static String logFileName = null;
+
+    private static String mp4FilePath = null;
+    private static String mp4FileName = null;
+
+
     /** Create a file Uri for saving an image or video */
-    public static String getOutputMediaFileUri(int type){
-        return getOutputMediaFile(type);
+
+    public static void initLogWriter(){
+        logWriterClose();
+        setLogFile();
+        try {
+            logWriter = new BufferedWriter(new FileWriter(logFilePath));
+        }catch (Exception e){
+            logWriter = null;
+            e.printStackTrace();
+        }
     }
 
+    public static void initCsvWriter(){
+        csvWriterClose();
+        setOutputMediaFile();
+        try {
+            csvWriter = new BufferedWriter(new FileWriter(csvFilePath));
+            csvWriter.append("time,gFx,gFy,gFz,wx,wy,wz,Bx,By,Bz");
+            csvWriter.newLine();
+        }catch (Exception e){
+            csvWriter = null;
+            e.printStackTrace();
+        }
+    }
+
+    public static String getCsvFileName(){
+        if( csvFileName == null) return "";
+        return csvFileName;
+    }
+
+    public static String getLogFileName(){
+        if( logFileName == null) return "";
+        return logFileName;
+    }
+
+    public static String getMp4FileName(){
+        if( mp4FileName == null) return "";
+        return mp4FileName;
+    }
+    public static String getMp4FilePath(){
+        if( mp4FilePath == null) return "";
+        return mp4FilePath;
+    }
+
+
+
     /** Create a File for saving an image or video */
-    public static String getOutputMediaFile(int type){
+    private static boolean setOutputMediaFile(){
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
 
         File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_MOVIES), "BLESensor");
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
 
         // Create the storage directory if it does not exist
         if (! mediaStorageDir.exists()){
             if (! mediaStorageDir.mkdirs()){
                 Log.d("BLESensor", "failed to create directory");
-                return null;
+                return false;
             }
         }
 
         // Create a media file name
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        File mediaFile;
-        String path;
-        if (type == MEDIA_TYPE_IMAGE){
-            path = mediaStorageDir.getPath() + File.separator +
-                    "IMG_"+ timeStamp + ".jpg";
-//            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-//                    "IMG_"+ timeStamp + ".jpg");
-        } else if(type == MEDIA_TYPE_VIDEO) {
-            path = mediaStorageDir.getPath() + File.separator +
-                    "VID_"+ timeStamp + ".mp4";
-//            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-//                    "VID_"+ timeStamp + ".mp4");
-        } else if(type == DATA_TYPE_CSV){
-            path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    + "/DATA_"+ timeStamp +".csv";
-        }
-        else {
-            return null;
-        }
-        Log.e("FASA","Return file:"+path);
 
-        return path;
+
+        mp4FileName = "VID_"+ timeStamp + ".mp4";
+        mp4FilePath = mediaStorageDir.getPath() + File.separator + mp4FileName;
+
+        csvFileName = "DATA_"+ timeStamp +".csv";
+        csvFilePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                + File.separator+ csvFileName;
+        return true;
+    }
+
+    private static void setLogFile(){
+        logFileName = "log.txt";
+        logFilePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + File.separator + logFileName;
+    }
+    public static void logWriterClose(){
+        if (logWriter != null){
+            try {
+                logWriter.close();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
+    }
+    public static void csvWriterClose(){
+        if (csvWriter != null){
+            try {
+                csvWriter.close();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+        }
     }
 
     public static void  printLog(String text)
     {
-        File logFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"log.txt");
-        if (!logFile.exists())
-        {
-            try
-            {
-                Log.d(TAG,"Create file :"+logFile.createNewFile());
-            }
-            catch (IOException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        try
-        {
-            //BufferedWriter for performance, true to set append to file flag
-            BufferedWriter buf = new BufferedWriter(new FileWriter(logFile, true));
-            buf.append(text);
-            buf.newLine();
-            buf.close();
-        }
-        catch (IOException e)
-        {
-            // TODO Auto-generated catch block
+        if (logWriter == null) return;
+        try{
+            logWriter.append(text);
+            logWriter.newLine();
+
+        }catch(Exception e){
             e.printStackTrace();
-            Log.e(TAG, e.toString());
-            Log.e(TAG, e.toString());
         }
+//
+//        File logFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"log.txt");
+//        if (!logFile.exists())
+//        {
+//            try
+//            {
+//                Log.d(TAG,"Create file :"+logFile.createNewFile());
+//            }
+//            catch (IOException e)
+//            {
+//                // TODO Auto-generated catch block
+//                e.printStackTrace();
+//            }
+//        }
+//        try
+//        {
+//            //BufferedWriter for performance, true to set append to file flag
+//            BufferedWriter buf = new BufferedWriter(new FileWriter(logFile, true));
+//            buf.append(text);
+//            buf.newLine();
+//            buf.close();
+//        }
+//        catch (IOException e)
+//        {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//            Log.e(TAG, e.toString());
+//            Log.e(TAG, e.toString());
+//        }
     }
 
-    public static String exportData(String csvPath,String time,float[] accel, float[] gyro, float[] compass){
-        boolean isnew = false;
-        File logFile = new File(csvPath);
-        if (!logFile.exists())
-        {
-            try
-            {
-                Log.d(TAG,"Create file :"+logFile.createNewFile());
-                isnew = true;
-            }
-            catch (IOException e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                Log.e(TAG, e.toString());
-            }
-        }
+    public static boolean exportData(String time,float[] accel, float[] gyro, float[] compass){
+
         try
         {
             //BufferedWriter for performance, true to set append to file flag
-            BufferedWriter buf = new BufferedWriter(new FileWriter(logFile, true));
-            //write header when new file created.
-            if(isnew){
-                buf.append("time,gFx,gFy,gFz,wx,wy,wz,Bx,By,Bz");
-                buf.newLine();
-            }
+
             Calendar calendar = Calendar.getInstance();
             SimpleDateFormat simpleDateFormat = new SimpleDateFormat("EEEE dd-MMM-yyyy hh-mm-ss a,");
 //            buf.append(simpleDateFormat.format(calendar.getTime()));
-            buf.append(time);
-            buf.append(",");
+            csvWriter.append(time);
+            csvWriter.append(",");
             for(int i =0; i<3; i++){
-                buf.append(zeroPrint(accel[i]));
-                buf.append(",");
+                csvWriter.append(zeroPrint(accel[i]));
+                csvWriter.append(",");
             }
             for(int i =0; i<3; i++){
-                buf.append(zeroPrint(gyro[i]));
-                buf.append(",");
+                csvWriter.append(zeroPrint(gyro[i]));
+                csvWriter.append(",");
             }
             for(int i =0; i<3; i++){
-                buf.append(zeroPrint(compass[i]));
-                buf.append(i<2?",":"");
+                csvWriter.append(zeroPrint(compass[i]));
+                csvWriter.append(i<2?",":"");
             }
-            buf.newLine();
-            buf.close();
-            return csvPath;
+            csvWriter.newLine();
+            return true;
         }
         catch (IOException e)
         {
             // TODO Auto-generated catch block
             e.printStackTrace();
-            Log.e(TAG, e.toString());
-            return "Failed";
+            return false;
         }
     }
 
@@ -172,14 +219,14 @@ public class Util {
         }
     }
 
-    public static void exportMp4ToGallery(Context context, String filePath) {
+    public static void exportMp4ToGallery(Context context) {
         final ContentValues values = new ContentValues(2);
         values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
-        values.put(MediaStore.Video.Media.DATA, filePath);
+        values.put(MediaStore.Video.Media.DATA, csvFilePath);
         context.getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 values);
         context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                Uri.parse("file://" + filePath)));
+                Uri.parse("file://" + csvFilePath)));
     }
 
     public static float[] Half(byte[] data, int offset){
@@ -201,6 +248,7 @@ public class Util {
     }
 
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+
     public static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
         for (int j = 0; j < bytes.length; j++) {

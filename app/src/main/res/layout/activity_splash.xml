@@ -15,7 +15,7 @@
         android:fontFamily="sans-serif-medium"
         android:paddingHorizontal="30dp"
         android:paddingVertical="20dp"
-        android:text="BLE Sensor"
+        android:text="@string/app_name"
         android:textColor="@color/white"
         android:textSize="40dp"
         android:textStyle="bold"

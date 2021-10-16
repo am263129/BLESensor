@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BLE Sensor</string>
+    <string name="app_name">PetVoice Logger</string>
     <string name="sensor_setting">MEMS_CONF</string>
     <string name="no_bound">DFU_NOBOND</string>
     <string name="msg_connecting">Connecting to sensor…</string>
