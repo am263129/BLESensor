@@ -1,4 +1,4 @@
-package com.example.bluetooth.seed;
+package com.petvoice.logger;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -21,11 +21,11 @@ public class LogItem {
         this.datetime = address;
     }
 
-    public String getAddress() {
+    public String getDateTime() {
         return datetime;
     }
 
-    public String getName() {
+    public String getLog() {
         return message;
     }
 }

@@ -1,4 +1,4 @@
-package com.example.bluetooth.seed;
+package com.petvoice.logger;
 
 public class BLEDevice {
     private String name, address;

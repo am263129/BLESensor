@@ -169,9 +169,7 @@ public class CameraThread extends Thread {
     @SuppressLint("MissingPermission")
     final void startPreview(final int width, final int height) {
         Log.v(TAG, "startPreview:");
-
         try {
-
             if (cameraManager == null) return;
             for (String cameraId : cameraManager.getCameraIdList()) {
                 CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
@@ -180,6 +178,7 @@ public class CameraThread extends Thread {
                     continue;
                 }
                 if (characteristics.get(CameraCharacteristics.LENS_FACING) == lensFacing.getFacing()) {
+
                     sensorArraySize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
 
                     flashSupport = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);

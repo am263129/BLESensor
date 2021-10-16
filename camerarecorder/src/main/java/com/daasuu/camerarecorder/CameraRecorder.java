@@ -218,8 +218,6 @@ public class CameraRecorder {
      */
     public void start(final String filePath) {
         if (started) return;
-
-
         new Handler().post(new Runnable() {
             @Override
             public void run() {
@@ -254,7 +252,6 @@ public class CameraRecorder {
                 } catch (Exception e) {
                     notifyOnError(e);
                 }
-
             }
         });
 
@@ -295,7 +292,6 @@ public class CameraRecorder {
             notifyOnError(e);
             e.printStackTrace();
         }
-
 
         started = false;
     }

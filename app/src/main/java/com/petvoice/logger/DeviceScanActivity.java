@@ -1,15 +1,11 @@
-package com.example.bluetooth.seed;
+package com.petvoice.logger;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.Manifest;
-import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -21,27 +17,22 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Half;
 import android.util.Log;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.EventListener;
 import java.util.List;
 
 import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
 
 
-public class MainActivity extends AppCompatActivity implements DeviceAdapter.ItemClickListener {
+public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapter.ItemClickListener {
 
     public BluetoothAdapter mBluetoothAdapter;
     public BluetoothLeScanner mBluetoothLeScanner;
@@ -75,8 +66,6 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
         initUi();
         initScanner();
     }
@@ -88,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
     }
 
     public void initUi(){
+        setContentView(R.layout.activity_devicescan);
         modeBLE = findViewById(R.id.mode_ble);
         modeClassic = findViewById(R.id.mode_classic);
         devicelist = findViewById(R.id.devicelist);
@@ -188,6 +178,23 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
         startActivity(intent);
     }
 
+    public void OpenDevice(){
+        if (scanning) {
+            if(SCANMODE == MODE_CLASSIC){
+                mBluetoothAdapter.cancelDiscovery();
+            }
+            else{
+                mBluetoothLeScanner.stopScan(mLeScanCallback);
+            }
+            scanning = false;
+            updateUi();
+        }
+        Intent intent = new Intent(this, DeviceControlActivity.class);
+        intent.putExtra("name",WearDev.getName());
+        intent.putExtra("address",WearDev.getAddress());
+        startActivity(intent);
+    }
+
     private void addLog(String msg){
         Log.e(TAG,msg);
     }
@@ -236,7 +243,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
         if(isnew) {
             status.setText("Device Found");
             bluetoothDevices.add(new BLEDevice(devicename,address));
-            MainActivity.this.runOnUiThread(new Runnable() {
+            DeviceScanActivity.this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     deviceAdapter.notifyDataSetChanged();
@@ -245,7 +252,9 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
         }
         if (devicename != null && devicename.equals("WearDev")) {
             addLog("WearDev Sensor Device Found." + " Address:" + address);
+            Toast.makeText(this,"Sensor Found, auto connecting...", Toast.LENGTH_SHORT).show();
             WearDev = device;
+            OpenDevice();
         }
     }
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
@@ -267,7 +276,7 @@ public class MainActivity extends AppCompatActivity implements DeviceAdapter.Ite
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 scanning=false;
                 updateUi();
-                Toast.makeText(MainActivity.this, "scan finished",Toast.LENGTH_LONG).show();
+                Toast.makeText(DeviceScanActivity.this, "scan finished",Toast.LENGTH_LONG).show();
             }
         }
     };

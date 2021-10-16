@@ -1,4 +1,4 @@
-package com.example.bluetooth.seed;
+package com.petvoice.logger;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -8,13 +8,11 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.BluetoothLeScanner;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.widget.Toast;
 
 public class SplashActivity extends AppCompatActivity {
@@ -50,7 +48,8 @@ public class SplashActivity extends AppCompatActivity {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                 || ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                || ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                ) {
             ActivityCompat.requestPermissions(this, new String[]{
                     Manifest.permission.RECORD_AUDIO,
                     Manifest.permission.CAMERA,
@@ -58,7 +57,7 @@ public class SplashActivity extends AppCompatActivity {
                     Manifest.permission.WRITE_EXTERNAL_STORAGE,
                     Manifest.permission.BLUETOOTH,
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION}, ALLPERMISSION);
+                    Manifest.permission.ACCESS_COARSE_LOCATION,}, ALLPERMISSION);
             return false;
         }
         return true;
@@ -82,7 +81,7 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     public void startMain(){
-        Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+        Intent intent = new Intent(SplashActivity.this, DeviceScanActivity.class);
         startActivity(intent);
         finish();
     }

@@ -95,6 +95,7 @@ public class MediaVideoEncoder extends MediaEncoder {
 
         mediaCodec = MediaCodec.createEncoderByType(MIME_TYPE);
 
+
         mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         // get Surface for encoder input
         // this method only can call between #configure and #start
@@ -168,6 +169,7 @@ public class MediaVideoEncoder extends MediaEncoder {
         }
         return null;
     }
+
 
     /**
      * select color format available on specific codec and we can use.
