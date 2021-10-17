@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.bluetooth.seed">
+    package="com.petvoice.logger">
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -23,7 +23,8 @@
         android:theme="@style/Theme.Seed">
         <activity
             android:name=".SplashActivity"
-            android:exported="true" >
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,12 +33,12 @@
         <activity
             android:name=".DeviceControlActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
-
+            android:screenOrientation="landscape">
         </activity>
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".DeviceScanActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
         </activity>
     </application>
 

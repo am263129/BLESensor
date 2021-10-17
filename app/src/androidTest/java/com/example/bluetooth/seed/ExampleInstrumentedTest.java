@@ -1,4 +1,4 @@
-package com.example.bluetooth.seed;
+package com.petvoice.logger;
 
 import android.content.Context;
 
