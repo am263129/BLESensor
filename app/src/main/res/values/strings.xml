@@ -39,4 +39,7 @@
     <string name="config_UUID">00002902-0000-1000-8000-00805f9b34fb</string>
     <string name="msg_undefined_memsdata">MEMS_DATA not is not defined.</string>
     <string name="msg_reading_failed">reading data failed</string>
+    <string name="description_info">Info</string>
+    <string name="permission_request">This sample needs permission for camera and audio recording.</string>
+    <string name="camera_error">This device doesn\'t support Camera2 API.</string>
 </resources>

@@ -50,11 +50,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-import com.daasuu.camerarecorder.CameraRecordListener;
-import com.daasuu.camerarecorder.CameraRecorder;
-import com.daasuu.camerarecorder.CameraRecorderBuilder;
-import com.daasuu.camerarecorder.LensFacing;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -92,10 +87,6 @@ public class DeviceControlActivity extends AppCompatActivity {
     private int selected = 0;
     private final String TAG = "ControlActivity";
 
-
-    private SampleGLView sampleGLView;
-    protected CameraRecorder cameraRecorder;
-    protected LensFacing lensFacing = LensFacing.BACK;
     protected int cameraWidth = 864;
     protected int cameraHeight = 480;
     protected int videoWidth = 864;
@@ -111,15 +102,6 @@ public class DeviceControlActivity extends AppCompatActivity {
     private long starttime = 0;
     private int deviceWidth;
 
-    Handler testHanler = new Handler(){
-        @Override
-        public void handleMessage(@NonNull Message msg) {
-            super.handleMessage(msg);
-            CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
-            btnRecord.performClick();
-        }
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -131,7 +113,6 @@ public class DeviceControlActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        releaseCamera();
         Log.d(TAG, "onStop");
         Util.logWriterClose();
     }
@@ -148,7 +129,6 @@ public class DeviceControlActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        setUpCamera();
         initBluetooth();
         Log.d(TAG, "onStart");
     }
@@ -208,90 +188,11 @@ public class DeviceControlActivity extends AppCompatActivity {
         sensorAddress = getIntent().getStringExtra("address") == null ? "" : getIntent().getStringExtra("address");
         deviceName.setText(sensorAddress);
         labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));
+
+        getFragmentManager().beginTransaction()
+                .replace(R.id.cameraView, Camera2VideoFragment.newInstance())
+                .commit();
     }
-
-    /**
-     * set free camera, when finish app or after recording finished.
-     */
-
-    private void releaseCamera() {
-        if (sampleGLView != null) {
-            sampleGLView.onPause();
-        }
-
-        if (cameraRecorder != null) {
-            cameraRecorder.stop();
-            cameraRecorder.release();
-            cameraRecorder = null;
-        }
-
-        if (sampleGLView != null) {
-            ((FrameLayout) findViewById(R.id.cameraView)).removeView(sampleGLView);
-            sampleGLView = null;
-        }
-    }
-
-    /**
-     * setup camera view, for preview video recording.
-     */
-
-    private void setUpCameraView() {
-        runOnUiThread(() -> {
-            FrameLayout frameLayout = findViewById(R.id.cameraView);
-            frameLayout.removeAllViews();
-            sampleGLView = null;
-            sampleGLView = new SampleGLView(getApplicationContext());
-            sampleGLView.setTouchListener((event, width, height) -> {
-                if (cameraRecorder == null) return;
-                cameraRecorder.changeManualFocusPoint(event.getX(), event.getY(), width, height);
-            });
-            frameLayout.addView(sampleGLView);
-        });
-    }
-
-    /**
-     * setup camera. this called everytime after pause or stop. or record video.
-     */
-    private void setUpCamera() {
-        setUpCameraView();
-        cameraRecorder = new CameraRecorderBuilder(this, sampleGLView)
-                //.recordNoFilter(true)
-                .cameraRecordListener(new CameraRecordListener() {
-                    @Override
-                    public void onGetFlashSupport(boolean flashSupport) {
-                    }
-
-                    @Override
-                    public void onRecordComplete() {
-                        Util.exportMp4ToGallery(getApplicationContext());
-                    }
-
-                    @Override
-                    public void onRecordStart() {
-
-                    }
-
-                    @Override
-                    public void onError(Exception exception) {
-                        exception.printStackTrace();
-                    }
-
-                    @Override
-                    public void onCameraThreadFinish() {
-                        if (toggleClick) {
-                            runOnUiThread(() -> {
-                                setUpCamera();
-                            });
-                        }
-                        toggleClick = false;
-                    }
-                })
-                .videoSize(videoWidth, videoHeight)
-                .cameraSize(cameraWidth, cameraHeight)
-                .lensFacing(lensFacing)
-                .build();
-    }
-
     public List<Camera.Size> getSupportedVideoSizes(Camera camera) {
         if (camera.getParameters().getSupportedVideoSizes() != null) {
             return camera.getParameters().getSupportedVideoSizes();
@@ -312,7 +213,9 @@ public class DeviceControlActivity extends AppCompatActivity {
         if (recording) {
             recording = false;
             csvWriterClose();
-            cameraRecorder.stop();
+            Message msg = new Message();
+            msg.what = Camera2VideoFragment.EMIT_STOP_RECORDING;
+            Camera2VideoFragment.getInstance().cameraControlHandler.sendMessage(msg);
             stopReadMemsData();
             Toast.makeText(
                     this,
@@ -320,33 +223,34 @@ public class DeviceControlActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG
             ).show();
         } else {
-//            //device is connected but memsdata is null.
-//            if (memsData == null) {
-//                Toast.makeText(
-//                        this,
-//                        "Unable to read mems data. try reconnect to sensor.",
-//                        Toast.LENGTH_SHORT
-//                ).show();
-//                addLog("MEMS_DATA undefined.");
-//                return;
-//            }
-//            //if device is not connected, unable to record.
-//            if (CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED) {
-//                Toast.makeText(
-//                        this,
-//                        "Connection Lost.",
-//                        Toast.LENGTH_SHORT
-//                ).show();
-//                addLog("Connection lost.");
-//                return;
-//            }
+            //device is connected but memsdata is null.
+            if (memsData == null) {
+                Toast.makeText(
+                        this,
+                        "Unable to read mems data. try reconnect to sensor.",
+                        Toast.LENGTH_SHORT
+                ).show();
+                addLog("MEMS_DATA undefined.");
+                return;
+            }
+            //if device is not connected, unable to record.
+            if (CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED) {
+                Toast.makeText(
+                        this,
+                        "Connection Lost.",
+                        Toast.LENGTH_SHORT
+                ).show();
+                addLog("Connection lost.");
+                return;
+            }
             starttime = System.currentTimeMillis();
             recording = true;
             Util.initCsvWriter();
             Log.e(TAG, Util.getMp4FilePath());
-            cameraRecorder.start(Util.getMp4FilePath());
-//            startReadMemsData(memsData);
-            testHanler.sendEmptyMessageDelayed(0,5000);
+            Message msg = new Message();
+            msg.what = Camera2VideoFragment.EMIT_START_RECORDING;
+            Camera2VideoFragment.getInstance().cameraControlHandler.sendMessage(msg);
+            startReadMemsData(memsData);
         }
         iconRecord.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
         labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));
