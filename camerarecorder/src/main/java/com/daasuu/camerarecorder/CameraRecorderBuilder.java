@@ -24,14 +24,14 @@ public class CameraRecorderBuilder {
     private Resources resources;
     private Activity activity;
     private CameraRecordListener cameraRecordListener;
-    private int fileWidth = 480;
-    private int fileHeight = 640;
+    private int fileWidth = 864;
+    private int fileHeight = 480;
     private boolean flipVertical = false;
     private boolean flipHorizontal = false;
     private boolean mute = false;
     private boolean recordNoFilter = false;
-    private int cameraWidth = 1280;
-    private int cameraHeight = 720;
+    private int cameraWidth = 4096;
+    private int cameraHeight = 2160;
     private GlFilter glFilter;
 
     public CameraRecorderBuilder(Activity activity, GLSurfaceView glSurfaceView) {

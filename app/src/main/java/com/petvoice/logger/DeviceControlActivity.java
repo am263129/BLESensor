@@ -36,6 +36,7 @@ import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceHolder;
@@ -110,6 +111,14 @@ public class DeviceControlActivity extends AppCompatActivity {
     private long starttime = 0;
     private int deviceWidth;
 
+    Handler testHanler = new Handler(){
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            super.handleMessage(msg);
+            CONNECTION_STATUS = BluetoothProfile.STATE_DISCONNECTED;
+            btnRecord.performClick();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -197,9 +206,8 @@ public class DeviceControlActivity extends AppCompatActivity {
         chk_log = configDlg.findViewById(R.id.save_log);
         chk_csv = configDlg.findViewById(R.id.save_csv);
         sensorAddress = getIntent().getStringExtra("address") == null ? "" : getIntent().getStringExtra("address");
-        deviceName.setText(getIntent().getStringExtra("name") == null ? "Unknown" : getIntent().getStringExtra("name"));
+        deviceName.setText(sensorAddress);
         labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));
-
     }
 
     /**
@@ -312,32 +320,33 @@ public class DeviceControlActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG
             ).show();
         } else {
-            //device is connected but memsdata is null.
-            if (memsData == null) {
-                Toast.makeText(
-                        this,
-                        "Unable to read mems data. try reconnect to sensor.",
-                        Toast.LENGTH_SHORT
-                ).show();
-                addLog("MEMS_DATA undefined.");
-                return;
-            }
-            //if device is not connected, unable to record.
-            if (CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED) {
-                Toast.makeText(
-                        this,
-                        "Connection Lost.",
-                        Toast.LENGTH_SHORT
-                ).show();
-                addLog("Connection lost.");
-                return;
-            }
+//            //device is connected but memsdata is null.
+//            if (memsData == null) {
+//                Toast.makeText(
+//                        this,
+//                        "Unable to read mems data. try reconnect to sensor.",
+//                        Toast.LENGTH_SHORT
+//                ).show();
+//                addLog("MEMS_DATA undefined.");
+//                return;
+//            }
+//            //if device is not connected, unable to record.
+//            if (CONNECTION_STATUS != BluetoothProfile.STATE_CONNECTED) {
+//                Toast.makeText(
+//                        this,
+//                        "Connection Lost.",
+//                        Toast.LENGTH_SHORT
+//                ).show();
+//                addLog("Connection lost.");
+//                return;
+//            }
             starttime = System.currentTimeMillis();
             recording = true;
             Util.initCsvWriter();
             Log.e(TAG, Util.getMp4FilePath());
             cameraRecorder.start(Util.getMp4FilePath());
-            startReadMemsData(memsData);
+//            startReadMemsData(memsData);
+            testHanler.sendEmptyMessageDelayed(0,5000);
         }
         iconRecord.setBackgroundResource(recording ? R.drawable.ic_stop : R.drawable.ic_record);
         labelRecord.setText(recording ? getString(R.string.label_stop) : getString(R.string.label_start));

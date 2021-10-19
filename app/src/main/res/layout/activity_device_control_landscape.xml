@@ -4,13 +4,14 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".DeviceControlActivity">
+    tools:context=".DeviceControlActivity"
+    android:background="@color/black">
 
     <FrameLayout
         android:id="@+id/cameraView"
         android:layout_width="0dp"
-        app:layout_constraintEnd_toEndOf="parent"
         android:layout_height="match_parent"
+        app:layout_constraintDimensionRatio="1.78"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -22,7 +23,7 @@
         android:background="@drawable/backtoggle"
         android:onClick="recordVideo"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/cameraView"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         android:layout_marginEnd="20dp">
 
