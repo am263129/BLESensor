@@ -270,18 +270,21 @@ public class Camera2VideoFragment extends Fragment
      */
     private static Size chooseVideoSize(Size[] choices)
     {
+        Size secondray = null;
         for (Size size : choices)
         {
-
             Log.e(TAG, String.format("Video size:%d x %d", size.getWidth(), size.getHeight()));
-            if ( size.getWidth() <= 1080 && size.getHeight() <= 1080 && size.getWidth() == size.getHeight() * 16 / 9  )
+            if(size.getWidth() >= 1280){
+                secondray = size;
+            }
+            if ( size.getWidth() == 1280 && size.getHeight() == 720 )
             {
                 Log.e("SelectedSize", size.getWidth()+":" + size.getHeight());
                 return size;
             }
         }
         Log.e(TAG, "Couldn't find any suitable video size");
-        return choices[choices.length - 1];
+        return secondray==null?choices[0]:secondray;
     }
 
     /**

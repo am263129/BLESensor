@@ -5,7 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".DeviceControlActivity"
-    android:background="@color/black">
+    android:background="@color/black"
+    android:keepScreenOn="true">
+
 
     <FrameLayout
         android:id="@+id/cameraView"
@@ -14,7 +16,22 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
+    <Chronometer
+        android:id="@+id/timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@color/transparent"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:text="00:00"
+        android:textAlignment="center"
+        android:textColor="@color/white"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_margin="20dp"/>
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/btnRecord"
         android:layout_width="50dp"
