@@ -11,16 +11,21 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
+import android.util.Size;
 import android.widget.Toast;
 
 public class SplashActivity extends AppCompatActivity {
-
     Handler startHandler = new Handler();
     public BluetoothAdapter mBluetoothAdapter;
     public BluetoothManager bluetoothManager;
-
     private final int LOCATIONPERMISSION = 9001;
     private final int REQUEST_ENABLE_BT = 9002;
     private final int ALLPERMISSION = 9003;

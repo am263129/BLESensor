@@ -25,13 +25,10 @@ public class Util {
 
     private static BufferedWriter csvWriter = null;
     private static BufferedWriter logWriter = null;
-
     private static String csvFilePath = null;
     private static String csvFileName = null;
-
     private static String logFilePath = null;
     private static String logFileName = null;
-
     private static String mp4FilePath = null;
     private static String mp4FileName = null;
 

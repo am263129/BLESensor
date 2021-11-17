@@ -43,7 +43,6 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
 
     private ArrayList<BLEDevice> bluetoothDevices = new ArrayList<>();
     private DeviceAdapter deviceAdapter;
-    private BluetoothDevice WearDev;
     private RecyclerView devicelist;
     private TextView labelScan, status;
     private ConstraintLayout toggleScan, bgScan;
@@ -63,6 +62,7 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
     private final int MODE_BLE = 1;
     private RadioButton modeBLE, modeClassic;
     private ConstraintLayout noDevice;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -76,7 +76,7 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
         super.onResume();
     }
 
-    public void initUi(){
+    public void initUi() {
         setContentView(R.layout.activity_devicescan);
         modeBLE = findViewById(R.id.mode_ble);
         modeClassic = findViewById(R.id.mode_classic);
@@ -94,8 +94,9 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
         deviceAdapter.setClickListener(this);
         toggleScan.setSelected(true);
     }
+
     public void initScanner() {
-        bluetoothManager =(BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
         mHandler = new Handler();
         mBluetoothLeScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
@@ -103,100 +104,82 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
         scanSettings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
                 .build();
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        this.registerReceiver(mReceiver, filter);
-        // Register for broadcasts when discovery has finished
-        filter = new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        this.registerReceiver(mReceiver, filter);
     }
 
-    public void updateUi(){
+    public void updateUi() {
         try {
             labelScan.setText(scanning ? "Stop" : "Scan");
             status.setText(bluetoothDevices.size() == 0 ? "No Scanned Device" : "Let's Scan device.");
             bgScan.setBackgroundResource(scanning ? R.drawable.ic_stopscan : R.drawable.ic_scanback);
             toggleScan.setSelected(!scanning);
-            noDevice.setVisibility(scanning? View.GONE :bluetoothDevices.size() == 0? View.VISIBLE:View.GONE);
-        }catch (Exception e){
+            noDevice.setVisibility(scanning ? View.GONE : bluetoothDevices.size() == 0 ? View.VISIBLE : View.GONE);
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        }
-    public void ToggleScan(View view){
-        if(SCANMODE == MODE_CLASSIC) {
-                if (scanning) {
-                    mBluetoothAdapter.cancelDiscovery();
-                    scanning = false;
-                } else {
-                    bluetoothDevices.clear();
-                    deviceAdapter.notifyDataSetChanged();
-                    mBluetoothAdapter.startDiscovery();
-                    scanning = true;
-                }
-        }
-        else {
-                if (scanning) {
+    }
+
+    public void ToggleScan(View view) {
+        if (scanning) {
+            mBluetoothLeScanner.stopScan(mLeScanCallback);
+            scanning = false;
+            progressBar.setVisibility(View.GONE);
+        } else {
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
                     mBluetoothLeScanner.stopScan(mLeScanCallback);
                     scanning = false;
+                    updateUi();
                     progressBar.setVisibility(View.GONE);
-                } else {
-                    mHandler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mBluetoothLeScanner.stopScan(mLeScanCallback);
-                            scanning = false;
-                            updateUi();
-                            progressBar.setVisibility(View.GONE);
-                        }
-                    },SCAN_PERIOD);
-                    progressBar.setVisibility(View.VISIBLE);
-                    bluetoothDevices.clear();
-                    deviceAdapter.notifyDataSetChanged();
-                    mBluetoothLeScanner.startScan(null,scanSettings,mLeScanCallback);
-                    scanning = true;
                 }
+            }, SCAN_PERIOD);
+            progressBar.setVisibility(View.VISIBLE);
+            bluetoothDevices.clear();
+            deviceAdapter.notifyDataSetChanged();
+            mBluetoothLeScanner.startScan(null, scanSettings, mLeScanCallback);
+            scanning = true;
         }
         updateUi();
     }
-    public void modeSetting(View view){
-        SCANMODE = modeClassic.isChecked()?MODE_CLASSIC:MODE_BLE;
+
+    public void modeSetting(View view) {
+        SCANMODE = modeClassic.isChecked() ? MODE_CLASSIC : MODE_BLE;
     }
 
-    public void OpenDevice(int position){
+    public void OpenDevice(int position) {
         if (scanning) {
-            if(SCANMODE == MODE_CLASSIC){
+            if (SCANMODE == MODE_CLASSIC) {
                 mBluetoothAdapter.cancelDiscovery();
-            }
-            else{
+            } else {
                 mBluetoothLeScanner.stopScan(mLeScanCallback);
             }
             scanning = false;
             updateUi();
         }
         Intent intent = new Intent(this, DeviceControlActivity.class);
-        intent.putExtra("name",bluetoothDevices.get(position).getName());
-        intent.putExtra("address",bluetoothDevices.get(position).getAddress());
+        intent.putExtra("name", bluetoothDevices.get(position).getName());
+        intent.putExtra("address", bluetoothDevices.get(position).getAddress());
         startActivity(intent);
     }
 
-    public void OpenDevice(){
+    public void OpenDevice(BluetoothDevice WearDev) {
         if (scanning) {
-            if(SCANMODE == MODE_CLASSIC){
+            if (SCANMODE == MODE_CLASSIC) {
                 mBluetoothAdapter.cancelDiscovery();
-            }
-            else{
+            } else {
                 mBluetoothLeScanner.stopScan(mLeScanCallback);
             }
             scanning = false;
             updateUi();
         }
         Intent intent = new Intent(this, DeviceControlActivity.class);
-        intent.putExtra("name",WearDev.getName());
-        intent.putExtra("address",WearDev.getAddress());
+        intent.putExtra("name", WearDev.getName());
+        intent.putExtra("address", WearDev.getAddress());
         startActivity(intent);
     }
 
-    private void addLog(String msg){
-        Log.e(TAG,msg);
+    private void addLog(String msg) {
+        Log.e(TAG, msg);
     }
 
     private final ScanCallback mLeScanCallback = new ScanCallback() {
@@ -205,6 +188,7 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
             super.onScanResult(callbackType, result);
             manageScanResult(result);
         }
+
         @Override
         public void onBatchScanResults(@NonNull List<ScanResult> results) {
             addLog("Batch mode" + results.size());
@@ -221,7 +205,7 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
         }
     };
 
-    private void manageScanResult(ScanResult result){
+    private void manageScanResult(ScanResult result) {
         addLog("Found device in onScanResult");
         BluetoothDevice device = result.getDevice();
         String address = device.getAddress();
@@ -231,18 +215,17 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
             devicename = result.getScanRecord().getDeviceName();
             addLog("name from record " + devicename);
         }
-
         addLog("Bluetooth Device Found. Name:" + devicename + " Address:" + address);
         boolean isnew = true;
-        for(BLEDevice item:bluetoothDevices){
-            if(item.getAddress().equals(device.getAddress())){
+        for (BLEDevice item : bluetoothDevices) {
+            if (item.getAddress().equals(device.getAddress())) {
                 isnew = false;
                 break;
             }
         }
-        if(isnew) {
+        if (isnew) {
             status.setText("Device Found");
-            bluetoothDevices.add(new BLEDevice(devicename,address));
+            bluetoothDevices.add(new BLEDevice(devicename, address));
             DeviceScanActivity.this.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -252,34 +235,10 @@ public class DeviceScanActivity extends AppCompatActivity implements DeviceAdapt
         }
         if (devicename != null && devicename.equals("WearDev")) {
             addLog("WearDev Sensor Device Found." + " Address:" + address);
-            Toast.makeText(this,"Sensor Found, auto connecting...", Toast.LENGTH_SHORT).show();
-            WearDev = device;
-            OpenDevice();
+            Toast.makeText(this, "Sensor Found, auto connecting...", Toast.LENGTH_SHORT).show();
+            OpenDevice(device);
         }
     }
-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            // When discovery finds a device
-            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                // Get the BluetoothDevice object from the Intent
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-
-                Log.e(TAG,"MainScan");
-                bluetoothDevices.add(new BLEDevice(device.getName(),device.getAddress()));
-                if(device.getName().equals("WearDev")){
-                    WearDev = device;
-                }
-                deviceAdapter.notifyDataSetChanged();
-                // When discovery is finished, change the Activity title
-            } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                scanning=false;
-                updateUi();
-                Toast.makeText(DeviceScanActivity.this, "scan finished",Toast.LENGTH_LONG).show();
-            }
-        }
-    };
 
 
     @Override
